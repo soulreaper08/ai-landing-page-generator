@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "1) Yes, there is a large headline \"Personalize Landing Pages in Seconds\" (with \"in Seconds\" in purple).  \n2) Yes, there is subtext mentioning AI: \"Upload your ad creative, enter a landing page URL, and let AI bridge the gap between your ads and your pages for maximum conversions.\" Additionally, a banner states \"Powered by Google Stitch AI — Turn ads into landing pages.\"  \n3) Yes, there is a Step 1 input area labeled \"Upload Your Ad Creative\" (with a purple circle and icon).  \n4) Yes, there are decorative elements: subtle star-like icons scattered across the background.  \n\nRating: 8/10 (clear, informative, and visually balanced with branding and decorative touches).",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1776359818,
+  "id": "20260417011654c209f64caee2480d",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "20260417011654c209f64caee2480d",
+  "usage": {
+    "completion_tokens": 155,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1031,
+    "prompt_tokens_details": {
+      "cached_tokens": 6
+    },
+    "total_tokens": 1186
+  }
+}

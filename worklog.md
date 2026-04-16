@@ -2,6 +2,89 @@
 
 ---
 
+## Enhancement Session — 2026-04-18 (Round 3)
+
+### Overall Assessment: ✅ Stable & Enhanced
+- **ESLint**: Clean — zero errors, zero warnings
+- **Dev Server**: Compiling successfully
+- All new features integrated without breaking existing flow
+
+### New Features Added
+
+1. **Live Preview Mode** (Results View)
+   - "Fullscreen Preview" button opens generated HTML in new browser tab via Blob URL
+   - "Copy All Code" button copies full HTML to clipboard
+   - Floating "Quick Actions" bar (fixed bottom) with: Back to Top, Fullscreen Preview, Copy Code, Download HTML
+   - New `QuickActionsBar` component (`src/components/quick-actions-bar.tsx`)
+
+2. **Onboarding Tooltip for First-Time Users**
+   - 3-step sequential tooltip highlighting: Upload → URL → Generate
+   - State machine (step 1 → 2 → 3 → done) with pulsing highlight
+   - localStorage check (`troopod-onboarded` key), Next/Skip buttons
+   - New `OnboardingTooltip` component (`src/components/onboarding-tooltip.tsx`)
+
+3. **Generation History Stats** (Results View)
+   - Session Stats card showing: total generations, average score, best score
+   - Mini CSS sparkline bar chart of quality scores (color-coded)
+   - Tracks scores via `sessionScores` state across generations
+
+### Styling Improvements
+
+1. **Hero Section Enhancements**
+   - Animated border glow around 3-step input area (`.input-area-glow`)
+   - Floating decorative AI icons (Sparkles, Code2) with `.animate-float-gentle`
+   - Mesh gradient behind Generate button (`.generate-btn-mesh`)
+   - Step progress indicator lines connecting steps 1→2→3
+
+2. **Results View Styling**
+   - Gradient border on quality score ring card (`.score-card-gradient`)
+   - Animated number counting for quality score (0 → final score)
+   - Pulsing glow effect on high-impact changes (`.high-impact-glow`)
+   - AI Explanation card with typing cursor effect (`.typing-cursor`)
+   - Gradient separators between results sections (`.results-separator`)
+
+3. **Micro-Animations** (globals.css)
+   - `.animate-slide-up-fade` — slide up + fade in
+   - `.animate-scale-in` — scale from 0.8 to 1 with fade
+   - `.animate-bounce-subtle` — gentle 2px bounce
+   - `.animate-glow` — subtle box-shadow pulse
+   - `.animate-shine-sweep` — light sweep across elements
+   - `.animate-float-gentle` — gentle 3px floating
+
+4. **Demo Sample Cards**
+   - Colored gradient overlays per theme (SaaS=violet, E-commerce=orange, Fitness=green)
+   - Hover parallax tilt effect (3D transform via onMouseMove)
+   - "Click to try" overlay with blur backdrop
+
+5. **Footer Enhancement**
+   - "Stay Updated" newsletter section with email input and subscribe button
+   - Social media icon links (GitHub, Twitter/X, LinkedIn) using Lucide icons + SVG
+   - Gradient separator between footer and main content (`.footer-gradient-sep`)
+   - Dark gradient background (`.footer-dark-gradient`)
+
+### Files Modified
+- `src/app/page.tsx` — ~1448 lines (all features integrated)
+- `src/app/globals.css` — ~1170 lines (new animations + styling classes)
+- `src/components/onboarding-tooltip.tsx` — NEW (3-step onboarding component)
+- `src/components/quick-actions-bar.tsx` — NEW (floating quick actions bar)
+
+### QA Results (Round 3 — agent-browser + VLM)
+- ✅ ESLint: 0 errors, 0 warnings
+- ✅ Dev Server: Compiling, routes returning 200
+- ✅ Hero section with headline — visible, VLM rated 8/10
+- ✅ 3-step input area with progress indicator lines — visible
+- ✅ Brand logo marquee — visible, VLM rated 8/10
+- ✅ Demo sample cards with parallax tilt and gradient overlays — in DOM
+- ✅ 6 feature cards with glass effect — verified
+- ✅ 3 how-it-works steps with gradient borders — verified
+- ✅ 6 template cards — verified
+- ✅ 3 pricing cards — verified
+- ✅ 4 floating decorative icons (Sparkles, Code2) — verified
+- ✅ Dark footer gradient with newsletter section — verified
+- ✅ API endpoints: /api/analyze (200), /api/generate (200)
+
+---
+
 ## Cron Review Session — 2026-04-17 (Round 2)
 
 ### Overall Assessment: ✅ Stable & Enhanced

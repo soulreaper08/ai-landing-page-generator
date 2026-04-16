@@ -21,6 +21,8 @@ import { BackToTop } from '@/components/back-to-top';
 import { NewsletterSection } from '@/components/newsletter-section';
 import { ScrollProgress } from '@/components/scroll-progress';
 import { AnimatedCounter } from '@/components/animated-counter';
+import { OnboardingTooltip } from '@/components/onboarding-tooltip';
+import { QuickActionsBar } from '@/components/quick-actions-bar';
 import {
   Rocket,
   Sparkles,
@@ -57,6 +59,10 @@ import {
   GraduationCap,
   Landmark,
   MonitorSmartphone,
+  Copy,
+  Maximize,
+  Github,
+  Mail,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
@@ -132,9 +138,9 @@ const brandLogos = [
 ];
 
 const demoSamples = [
-  { title: 'SaaS Product', imageUrl: '/demo/demo-saas-ad.png', url: 'https://linear.app' },
-  { title: 'E-commerce Sale', imageUrl: '/demo/demo-ecommerce-ad.png', url: 'https://shopify.com' },
-  { title: 'Fitness App', imageUrl: '/demo/demo-fitness-ad.png', url: 'https://cal.com' },
+  { title: 'SaaS Product', imageUrl: '/demo/demo-saas-ad.png', url: 'https://linear.app', gradient: 'demo-gradient-saas' },
+  { title: 'E-commerce Sale', imageUrl: '/demo/demo-ecommerce-ad.png', url: 'https://shopify.com', gradient: 'demo-gradient-ecommerce' },
+  { title: 'Fitness App', imageUrl: '/demo/demo-fitness-ad.png', url: 'https://cal.com', gradient: 'demo-gradient-fitness' },
 ];
 
 const features = [
@@ -229,10 +235,28 @@ export default function Home() {
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [generationResult, setGenerationResult] = useState<StitchGenerationResult | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [sessionScores, setSessionScores] = useState<number[]>([]);
+  const [animatedScore, setAnimatedScore] = useState(0);
+  const [typedExplanation, setTypedExplanation] = useState('');
   const { theme, setTheme } = useTheme();
   const generateRef = useRef<HTMLDivElement>(null);
+  const uploadRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Onboarding check
+  useEffect(() => {
+    const onboarded = localStorage.getItem('troopod-onboarded');
+    if (!onboarded) {
+      setShowOnboarding(true);
+    }
+  }, []);
+
+  const handleOnboardingComplete = useCallback(() => {
+    setShowOnboarding(false);
+    localStorage.setItem('troopod-onboarded', 'true');
+  }, []);
 
   // Auto-rotate testimonials
   useEffect(() => {
@@ -241,6 +265,10 @@ export default function Home() {
     }, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const totalGenerations = sessionScores.length;
+  const averageScore = totalGenerations > 0 ? Math.round(sessionScores.reduce((a, b) => a + b, 0) / totalGenerations) : 0;
+  const bestScore = totalGenerations > 0 ? Math.max(...sessionScores) : 0;
 
   const canGenerate = adImageUrl !== null && isUrlValid && !isAnalyzing;
 
@@ -347,6 +375,9 @@ export default function Home() {
       const data = await response.json();
       if (data.success && data.result) {
         setGenerationResult(data.result);
+        // Track session score
+        const score = data.result.qualityScore || 92;
+        setSessionScores((prev) => [...prev, score]);
         // Save to history
         const history = JSON.parse(localStorage.getItem('troopod-history') || '[]');
         history.unshift({
@@ -384,6 +415,9 @@ export default function Home() {
         aiExplanation: 'AI-generated hero section matching your ad creative branding for improved post-click conversion.',
       });
 
+      // Track session score
+      setSessionScores((prev) => [...prev, 92]);
+
       const history = JSON.parse(localStorage.getItem('troopod-history') || '[]');
       history.unshift({
         id: Date.now(),
@@ -400,6 +434,40 @@ export default function Home() {
       toast.success('Personalization complete!');
     }
   }, [canGenerate, adImageUrl, pageUrl, prompt]);
+
+  // Animated score counter
+  useEffect(() => {
+    if (appState !== 'results' || !generationResult) return;
+    const target = generationResult.qualityScore || 0;
+    setAnimatedScore(0);
+    let current = 0;
+    const step = Math.max(1, Math.ceil(target / 40));
+    const timer = setInterval(() => {
+      current += step;
+      if (current >= target) {
+        current = target;
+        clearInterval(timer);
+      }
+      setAnimatedScore(current);
+    }, 30);
+    return () => clearInterval(timer);
+  }, [appState, generationResult]);
+
+  // Typing effect for AI explanation
+  useEffect(() => {
+    if (appState !== 'results' || !generationResult?.aiExplanation) return;
+    const text = generationResult.aiExplanation;
+    setTypedExplanation('');
+    let index = 0;
+    const timer = setInterval(() => {
+      index += 1;
+      if (index >= text.length) {
+        clearInterval(timer);
+      }
+      setTypedExplanation(text.slice(0, index));
+    }, 20);
+    return () => clearInterval(timer);
+  }, [appState, generationResult]);
 
   // Keyboard shortcut: Ctrl+Enter to generate
   useEffect(() => {
@@ -451,6 +519,9 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col">
       <ScrollProgress />
+
+      {/* Onboarding */}
+      {mounted && showOnboarding && appState === 'input' && <OnboardingTooltip onComplete={handleOnboardingComplete} />}
 
       {/* Navbar */}
       <motion.header
@@ -518,6 +589,14 @@ export default function Home() {
           {appState === 'input' && (
             <motion.div key="input" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
 
+              {/* Floating decorative icons around hero */}
+              <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+                <div className="animate-float-gentle absolute top-[15%] left-[8%] text-primary/10 sm:text-primary/15"><Sparkles className="h-6 w-6 sm:h-8 sm:w-8" /></div>
+                <div className="animate-float-gentle absolute top-[25%] right-[10%] text-primary/10 sm:text-primary/15" style={{ animationDelay: '1s' }}><Code2 className="h-5 w-5 sm:h-7 sm:w-7" /></div>
+                <div className="animate-float-gentle absolute bottom-[20%] left-[12%] text-primary/8 sm:text-primary/12" style={{ animationDelay: '2s' }}><Sparkles className="h-4 w-4 sm:h-6 sm:w-6" /></div>
+                <div className="animate-float-gentle absolute bottom-[30%] right-[8%] text-primary/8 sm:text-primary/12" style={{ animationDelay: '0.5s' }}><Sparkles className="h-5 w-5 sm:h-7 sm:w-7" /></div>
+              </div>
+
               {/* Hero Section */}
               <section className="relative overflow-hidden">
                 <div className="absolute inset-0 overflow-hidden pointer-events-none noise-overlay gradient-mesh">
@@ -564,9 +643,9 @@ export default function Home() {
                   </motion.div>
 
                   {/* Input Cards */}
-                  <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="max-w-3xl mx-auto space-y-6" ref={generateRef}>
+                  <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="max-w-3xl mx-auto space-y-6 input-area-glow p-4 sm:p-6" ref={generateRef}>
                     {/* Step 1: Image Upload */}
-                    <div className="space-y-3">
+                    <div className="space-y-3 relative" id="onboard-upload" ref={uploadRef}>
                       <label className="text-sm font-medium flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">1</div>
                         <Layers className="h-4 w-4 text-primary" />
@@ -576,7 +655,7 @@ export default function Home() {
                     </div>
 
                     {/* Step 2: URL Input */}
-                    <div className="space-y-3">
+                    <div className="space-y-3" id="onboard-url">
                       <label className="text-sm font-medium flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">2</div>
                         <Gauge className="h-4 w-4 text-primary" />
@@ -606,8 +685,8 @@ export default function Home() {
                     )}
 
                     {/* Generate Button */}
-                    <div className="flex justify-center pt-4">
-                      <motion.div whileHover={{ scale: canGenerate ? 1.02 : 1 }} whileTap={{ scale: canGenerate ? 0.98 : 1 }}>
+                    <div className="flex justify-center pt-4" id="onboard-generate">
+                      <motion.div whileHover={{ scale: canGenerate ? 1.02 : 1 }} whileTap={{ scale: canGenerate ? 0.98 : 1 }} className="generate-btn-mesh">
                         <Button
                           size="lg"
                           onClick={handleGenerate}
@@ -652,13 +731,26 @@ export default function Home() {
                         <p className="text-center text-xs font-medium text-muted-foreground mb-4">Or try a demo sample</p>
                         <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto">
                           {demoSamples.map((demo) => (
-                            <Card key={demo.title} className="cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group overflow-hidden border border-border/60" onClick={() => handleTryDemo(demo.imageUrl, demo.url)}>
+                            <Card
+                              key={demo.title}
+                              className="cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group overflow-hidden border border-border/60"
+                              onClick={() => handleTryDemo(demo.imageUrl, demo.url)}
+                              onMouseMove={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const x = (e.clientX - rect.left) / rect.width - 0.5;
+                                const y = (e.clientY - rect.top) / rect.height - 0.5;
+                                e.currentTarget.style.transform = `perspective(600px) rotateY(${x * 8}deg) rotateX(${-y * 8}deg) translateY(-4px)`;
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = '';
+                              }}
+                            >
                               <CardContent className="p-0">
                                 <div className="relative aspect-[4/3] overflow-hidden">
                                   <img src={demo.imageUrl} alt={demo.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                  <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                    <Badge className="bg-white/90 text-background hover:bg-white text-[10px] px-2 py-0.5"><Zap className="h-2.5 w-2.5 mr-1" />Try it</Badge>
+                                  <div className={`absolute inset-0 ${demo.gradient} opacity-0 group-hover:opacity-60 transition-opacity duration-300`} />
+                                  <div className="absolute inset-0 demo-overlay opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                                    <span className="text-white font-semibold text-xs bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full">Click to try</span>
                                   </div>
                                 </div>
                                 <div className="p-2.5">
@@ -992,7 +1084,7 @@ export default function Home() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 {/* Quality Score */}
                 <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
-                  <Card className="border-border/60 h-full">
+                  <Card className="score-card-gradient h-full animate-shine-sweep">
                     <CardContent className="p-6 flex flex-col items-center justify-center">
                       <div className="relative w-28 h-28 mb-4">
                         <svg className="w-28 h-28 -rotate-90" viewBox="0 0 100 100">
@@ -1000,8 +1092,8 @@ export default function Home() {
                           <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray="251" strokeDashoffset={251 - (251 * (generationResult.qualityScore || 0)) / 100} strokeLinecap="round" className={cn('score-ring-animated', generationResult.qualityScore && generationResult.qualityScore >= 90 ? 'text-green-500' : generationResult.qualityScore && generationResult.qualityScore >= 70 ? 'text-amber-500' : 'text-red-500')} />
                         </svg>
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className={cn('text-2xl font-bold', getScoreColor(generationResult.qualityScore || 0))}>
-                            {generationResult.qualityScore || 0}
+                          <span className={cn('text-2xl font-bold tabular-nums', getScoreColor(animatedScore))}>
+                            {animatedScore}
                           </span>
                         </div>
                       </div>
@@ -1031,7 +1123,7 @@ export default function Home() {
                       </div>
                       <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
                         {(generationResult.changes || []).map((change) => (
-                          <div key={change.id} className="flex items-start gap-3 p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                          <div key={change.id} className={cn('flex items-start gap-3 p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors', change.impact === 'high' && 'high-impact-glow')}>
                             <Badge variant={change.impact === 'high' ? 'default' : change.impact === 'medium' ? 'secondary' : 'outline'} className={cn('text-[10px] mt-0.5 flex-shrink-0', change.impact === 'high' && 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20', change.impact === 'medium' && 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20')}>
                               {change.impact}
                             </Badge>
@@ -1049,6 +1141,57 @@ export default function Home() {
                   </Card>
                 </motion.div>
               </div>
+
+              {/* Gradient separator */}
+              <div className="results-separator" />
+
+              {/* Session Stats */}
+              {totalGenerations > 0 && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.23 }} className="mb-8">
+                  <Card className="border-border/60 animate-slide-up-fade">
+                    <CardContent className="p-5">
+                      <h3 className="text-sm font-semibold flex items-center gap-2 mb-4">
+                        <BarChart3 className="h-4 w-4 text-primary" />
+                        Session Stats
+                        <Badge variant="secondary" className="text-[10px] ml-auto">{totalGenerations} generation{totalGenerations !== 1 ? 's' : ''}</Badge>
+                      </h3>
+                      <div className="grid grid-cols-3 gap-4 mb-4">
+                        <div className="text-center">
+                          <p className="text-lg font-bold text-primary">{totalGenerations}</p>
+                          <p className="text-[10px] text-muted-foreground">Total</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-lg font-bold text-amber-500">{averageScore}</p>
+                          <p className="text-[10px] text-muted-foreground">Avg. Score</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-lg font-bold text-green-500">{bestScore}</p>
+                          <p className="text-[10px] text-muted-foreground">Best Score</p>
+                        </div>
+                      </div>
+                      {/* Mini sparkline */}
+                      {sessionScores.length > 1 && (
+                        <div className="flex items-end gap-1 h-8">
+                          {sessionScores.map((score, i) => (
+                            <div
+                              key={i}
+                              className="sparkline-bar flex-1 min-w-[4px]"
+                              style={{
+                                height: `${Math.max(8, (score / 100) * 100)}%`,
+                                backgroundColor: score >= 90 ? 'oklch(0.723 0.219 149.579)' : score >= 70 ? 'oklch(0.828 0.189 84.429)' : 'oklch(0.637 0.237 25.331)',
+                              }}
+                              title={`Generation ${i + 1}: ${score}`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Gradient separator */}
+              <div className="results-separator" />
 
               {/* Stat Cards Row */}
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="grid grid-cols-3 gap-4 mb-8">
@@ -1072,6 +1215,9 @@ export default function Home() {
                 </Card>
               </motion.div>
 
+              {/* Gradient separator */}
+              <div className="results-separator" />
+
               {/* AI Explanation */}
               {generationResult.aiExplanation && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-8">
@@ -1081,9 +1227,11 @@ export default function Home() {
                         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                           <Sparkles className="h-4 w-4 text-primary" />
                         </div>
-                        <div>
+                        <div className="flex-1">
                           <p className="text-sm font-semibold mb-1">AI Explanation</p>
-                          <p className="text-sm text-muted-foreground leading-relaxed">{generationResult.aiExplanation}</p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            <span className={typedExplanation.length < (generationResult.aiExplanation?.length || 0) ? 'typing-cursor' : ''}>{typedExplanation}</span>
+                          </p>
                         </div>
                       </div>
                     </CardContent>
@@ -1127,12 +1275,47 @@ export default function Home() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div className="space-y-6">
                   <PreviewViewer htmlCode={generationResult.htmlCode || ''} />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs"
+                      onClick={() => {
+                        const blob = new Blob([generationResult.htmlCode || ''], { type: 'text/html' });
+                        const url = URL.createObjectURL(blob);
+                        window.open(url, '_blank');
+                        toast.success('Opened fullscreen preview!');
+                      }}
+                    >
+                      <Maximize className="h-3.5 w-3.5" />
+                      Fullscreen Preview
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(generationResult.htmlCode || '');
+                          toast.success('HTML code copied to clipboard!');
+                        } catch {
+                          toast.error('Failed to copy');
+                        }
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy All Code
+                    </Button>
+                  </div>
                   <ExportPanel reactCode={generationResult.reactCode} htmlCode={generationResult.htmlCode} resultId={generationResult.projectId} />
                 </div>
                 <div>
                   <CodeViewer reactCode={generationResult.reactCode} htmlCode={generationResult.htmlCode} />
                 </div>
               </div>
+
+              {/* Quick Actions Bar */}
+              {generationResult.htmlCode && <QuickActionsBar htmlCode={generationResult.htmlCode} />}
 
               {/* Bottom actions */}
               <div className="flex items-center justify-center gap-4 pt-4 pb-8">
@@ -1163,9 +1346,33 @@ export default function Home() {
         </AnimatePresence>
       </main>
 
+      {/* Footer separator */}
+      <div className="footer-gradient-sep" />
+
       {/* Footer */}
-      <footer className="border-t border-border/40 bg-muted/20 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <footer className="footer-dark-gradient mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
+          {/* Newsletter section */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-10 pb-8 border-b border-border/30">
+            <div>
+              <h3 className="font-semibold text-sm mb-1">Stay Updated</h3>
+              <p className="text-xs text-muted-foreground">Get the latest AI personalization tips and feature updates.</p>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="email"
+                  placeholder="you@example.com"
+                  className="newsletter-input h-9 pl-9 pr-3 text-sm rounded-lg w-full outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+              <Button size="sm" className="btn-glow-anim bg-gradient-to-r from-primary to-violet-500 text-white h-9 px-4 text-sm font-medium rounded-lg">
+                Subscribe
+              </Button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center gap-2 mb-4">
@@ -1174,9 +1381,21 @@ export default function Home() {
                 </div>
                 <span className="font-bold">Troopod</span>
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
                 AI-powered landing page personalization. Turn any ad creative into a high-converting landing page.
               </p>
+              {/* Social media icons */}
+              <div className="flex items-center gap-2">
+                <a href="#" className="w-8 h-8 rounded-lg bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors" aria-label="GitHub">
+                  <Github className="h-4 w-4 text-muted-foreground" />
+                </a>
+                <a href="#" className="w-8 h-8 rounded-lg bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors" aria-label="Twitter">
+                  <svg className="h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></svg>
+                </a>
+                <a href="#" className="w-8 h-8 rounded-lg bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors" aria-label="LinkedIn">
+                  <svg className="h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                </a>
+              </div>
             </div>
             <div>
               <h4 className="font-semibold text-sm mb-3">Product</h4>
@@ -1208,10 +1427,16 @@ export default function Home() {
           <Separator className="my-8" />
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} Troopod. All rights reserved.</p>
-            <div className="flex items-center gap-4">
-              {['Twitter', 'GitHub', 'LinkedIn'].map((social) => (
-                <a key={social} href="#" className="text-muted-foreground hover:text-foreground transition-colors text-xs">{social}</a>
-              ))}
+            <div className="flex items-center gap-2">
+              <a href="#" className="w-7 h-7 rounded-md bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors" aria-label="GitHub">
+                <Github className="h-3.5 w-3.5 text-muted-foreground" />
+              </a>
+              <a href="#" className="w-7 h-7 rounded-md bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors" aria-label="Twitter">
+                <svg className="h-3.5 w-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></svg>
+              </a>
+              <a href="#" className="w-7 h-7 rounded-md bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors" aria-label="LinkedIn">
+                <svg className="h-3.5 w-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+              </a>
             </div>
           </div>
         </div>

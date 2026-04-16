@@ -912,3 +912,259 @@ html {
   pointer-events: none;
   will-change: transform, opacity;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   NEW MICRO-ANIMATIONS
+   ════════════════════════════════════════════════════════════════ */
+
+/* Slide up + fade in */
+@keyframes slide-up-fade {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up-fade {
+  animation: slide-up-fade 0.5s ease-out forwards;
+}
+
+/* Scale in from 0.8 to 1 with fade */
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-scale-in {
+  animation: scale-in 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Gentle bounce (2px up/down) */
+@keyframes bounce-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+.animate-bounce-subtle {
+  animation: bounce-subtle 2s ease-in-out infinite;
+}
+
+/* Subtle box-shadow pulse glow */
+@keyframes glow-box {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.606 0.25 292.717 / 0); }
+  50% { box-shadow: 0 0 16px 2px oklch(0.606 0.25 292.717 / 0.18); }
+}
+.animate-glow {
+  animation: glow-box 2.5s ease-in-out infinite;
+}
+
+/* Light sweep across elements */
+@keyframes shine-sweep {
+  0% { left: -100%; }
+  100% { left: 200%; }
+}
+.animate-shine-sweep {
+  position: relative;
+  overflow: hidden;
+}
+.animate-shine-sweep::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.12), transparent);
+  animation: shine-sweep 3s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 5;
+}
+.dark .animate-shine-sweep::after {
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.06), transparent);
+}
+
+/* Very gentle floating (3px) */
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.animate-float-gentle {
+  animation: float-gentle 4s ease-in-out infinite;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   HERO SECTION ENHANCEMENTS
+   ════════════════════════════════════════════════════════════════ */
+
+/* Animated border glow around 3-step input area */
+@keyframes input-area-border-glow {
+  0%, 100% { border-color: oklch(0.606 0.25 292.717 / 0.2); box-shadow: 0 0 20px oklch(0.606 0.25 292.717 / 0.05); }
+  50% { border-color: oklch(0.606 0.25 292.717 / 0.45); box-shadow: 0 0 35px oklch(0.606 0.25 292.717 / 0.12), 0 0 70px oklch(0.606 0.25 292.717 / 0.04); }
+}
+.input-area-glow {
+  border: 2px solid oklch(0.606 0.25 292.717 / 0.2);
+  border-radius: 1.5rem;
+  animation: input-area-border-glow 3s ease-in-out infinite;
+}
+
+/* Hero step progress indicator (vertical line on left) */
+.hero-step-line {
+  position: absolute;
+  left: 11px;
+  top: 24px;
+  bottom: -24px;
+  width: 2px;
+  background: linear-gradient(to bottom, oklch(0.606 0.25 292.717 / 0.3), oklch(0.606 0.25 292.717 / 0.08));
+}
+.hero-step-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(0.606 0.25 292.717 / 0.4);
+  animation: dot-travel 3s ease-in-out infinite;
+}
+
+/* Hero step progress indicator (horizontal on desktop) */
+.hero-step-line-horizontal {
+  position: relative;
+  height: 2px;
+  flex: 1;
+  min-width: 32px;
+  margin-top: 2rem;
+  background: linear-gradient(90deg, oklch(0.606 0.25 292.717 / 0.3), oklch(0.606 0.25 292.717 / 0.08));
+}
+.hero-step-line-horizontal::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(0.606 0.25 292.717 / 0.4);
+  animation: dot-travel 3s ease-in-out infinite;
+}
+
+/* Mesh gradient behind generate button */
+.generate-btn-mesh {
+  position: relative;
+}
+.generate-btn-mesh::before {
+  content: '';
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(ellipse at center, oklch(0.606 0.25 292.717 / 0.15), transparent 70%);
+  border-radius: 50%;
+  filter: blur(20px);
+  z-index: -1;
+  animation: glow-box 2.5s ease-in-out infinite;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RESULTS VIEW ENHANCEMENTS
+   ════════════════════════════════════════════════════════════════ */
+
+/* Gradient border on quality score ring card */
+.score-card-gradient {
+  position: relative;
+  border: none;
+}
+.score-card-gradient::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, oklch(0.606 0.25 292.717), oklch(0.702 0.183 293.541), oklch(0.491 0.27 292.581));
+  z-index: -1;
+  opacity: 0.6;
+}
+
+/* Pulsing glow for high-impact changes */
+@keyframes high-impact-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.723 0.219 149.579 / 0); }
+  50% { box-shadow: 0 0 12px 2px oklch(0.723 0.219 149.579 / 0.15); }
+}
+.high-impact-glow {
+  animation: high-impact-pulse 2s ease-in-out infinite;
+}
+
+/* Typing cursor for AI explanation */
+@keyframes typing-cursor {
+  0%, 100% { border-color: oklch(0.606 0.25 292.717); }
+  50% { border-color: transparent; }
+}
+.typing-cursor {
+  border-right: 2px solid oklch(0.606 0.25 292.717);
+  padding-right: 2px;
+  animation: typing-cursor 1s step-end infinite;
+}
+
+/* Gradient separator between results sections */
+.results-separator {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, oklch(0.606 0.25 292.717 / 0.2), oklch(0.702 0.183 293.541 / 0.15), oklch(0.606 0.25 292.717 / 0.2), transparent);
+  margin: 1.5rem 0;
+}
+
+/* Quick Actions Bar */
+.quick-actions-bar {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 -4px 30px oklch(0 0 0 / 0.08), 0 -1px 3px oklch(0 0 0 / 0.04);
+}
+.dark .quick-actions-bar {
+  box-shadow: 0 -4px 30px oklch(0 0 0 / 0.3), 0 -1px 3px oklch(0 0 0 / 0.15);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   DEMO SAMPLE CARDS ENHANCEMENTS
+   ════════════════════════════════════════════════════════════════ */
+
+/* Demo card gradient overlays */
+.demo-gradient-saas { background: linear-gradient(135deg, oklch(0.606 0.25 292.717 / 0.6), oklch(0.702 0.183 293.541 / 0.4)); }
+.demo-gradient-ecommerce { background: linear-gradient(135deg, oklch(0.637 0.237 25.331 / 0.6), oklch(0.656 0.241 330 / 0.4)); }
+.demo-gradient-fitness { background: linear-gradient(135deg, oklch(0.696 0.17 162.48 / 0.6), oklch(0.681 0.168 194.769 / 0.4)); }
+
+/* Click to try overlay */
+.demo-overlay {
+  background: linear-gradient(135deg, oklch(0 0 0 / 0.5), oklch(0 0 0 / 0.3));
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   FOOTER ENHANCEMENTS
+   ════════════════════════════════════════════════════════════════ */
+
+/* Footer gradient separator */
+.footer-gradient-sep {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 5%, oklch(0.606 0.25 292.717 / 0.15) 30%, oklch(0.702 0.183 293.541 / 0.1) 70%, transparent 95%);
+}
+
+/* Footer dark gradient */
+.footer-dark-gradient {
+  background: linear-gradient(to bottom, oklch(0.965 0.01 293), oklch(0.985 0.002 293));
+}
+.dark .footer-dark-gradient {
+  background: linear-gradient(to bottom, oklch(0.16 0.015 293), oklch(0.13 0.01 293));
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ONBOARDING TOOLTIP
+   ════════════════════════════════════════════════════════════════ */
+
+/* Pulsing highlight for onboarding */
+@keyframes onboard-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.606 0.25 292.717 / 0.5); }
+  50% { box-shadow: 0 0 0 8px oklch(0.606 0.25 292.717 / 0); }
+}
+.onboard-highlight {
+  animation: onboard-pulse 1.5s ease-in-out infinite;
+  position: relative;
+  z-index: 30;
+}
+
+/* Mini sparkline bars */
+.sparkline-bar {
+  transition: height 0.3s ease-out;
+  border-radius: 2px 2px 0 0;
+}
