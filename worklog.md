@@ -2,106 +2,83 @@
 
 ---
 
-## Current Project Status (as of latest session)
+## Cron Review Session — 2026-04-17 (Round 2)
 
-### Overall Assessment: ✅ Stable & All Bugs Fixed
+### Overall Assessment: ✅ Stable & Enhanced
 - **ESLint**: Clean — zero errors, zero warnings
 - **Dev Server**: Compiling successfully, all routes returning 200
-- **Critical bugs fixed this session**: 6 bugs identified and resolved
+- **Homepage**: Hero section visible, all sections rendering, new features added
+- **API Endpoints**: Both `/api/analyze` and `/api/generate` returning 200
+
+### Critical Bug Fixed This Session
+
+**🔴 Hero Section Invisible — framer-motion `useTransform` Bug**
+- The hero section content div had inline `opacity: 0; transform: scale(0.97)` making all content invisible
+- Root cause: `useTransform(scrollYProgress, [0, 0.15], [1, 0])` was applying incorrect scroll-based opacity
+- The `scrollYProgress` MotionValue reported a value >= 0.15 even at page top, causing opacity = 0
+- **Fix**: Removed `heroOpacity` and `heroScale` transforms, cleaned up unused `useScroll` and `useTransform` imports
+- **Impact**: This was the #1 visual bug — the entire hero section, input area, and CTA button were invisible to users
+
+### Styling Improvements Made
+
+1. **Animated Gradient Mesh Background** — Enhanced from 3 static orbs to 7 vivid radial gradients with dual animation cycles (25s/30s)
+2. **Glass-morphism Feature Cards** — Added `.glass-card` and `.feature-card` shine sweep on hover with staggered entrance animations
+3. **Enhanced How It Works** — Flex layout with gradient step connectors, animated traveling dot, glowing numbered circles
+4. **Testimonials Carousel** — Frosted glass cards, decorative quote marks, per-star staggered animations
+5. **Pricing Cards** — Shimmer badge, pricing ribbon, hover lift with enhanced shadow, animated checkmarks
+6. **Brand Logo Marquee** — Infinite scroll marquee with glass-card pills and gradient fade edges (12 brands)
+7. **New CSS Classes**: `.glass-card`, `.feature-card`, `.step-connector`, `.glow-step`, `.gradient-border-hover`, `.frosted-glass-card`, `.quote-mark`, `.shimmer-badge`, `.pricing-ribbon`, `.template-card`, `.keyboard-key`
+
+### New Features Added
+
+1. **Template Gallery Section** — 6 industry-specific templates (SaaS, Product Launch, Fitness, Property, Online Course, FinTech) with color palettes, icons, and "Use Template" click-to-prefill functionality
+2. **Keyboard Shortcut Tooltip** — Visual keyboard-key badge near generate button showing "⌘/Ctrl + Enter"
+3. **Newsletter Signup Section** — Integrated `NewsletterSection` component between FAQ and CTA
+
+### Files Modified
+- `src/app/page.tsx` — Hero fix, template gallery, keyboard shortcut, newsletter integration (1223 lines)
+- `src/app/globals.css` — Enhanced gradient mesh, glass-card, feature-card, step-connector, glow-step, frosted-glass, pricing-ribbon, template-card, keyboard-key CSS
+
+### QA Results (agent-browser + VLM)
+- ✅ Hero section with headline, subheadline, and badge — visible (8/10)
+- ✅ 3-step input area with generate button — visible
+- ✅ Brand logo marquee with 12 brands — visible and scrolling
+- ✅ How It Works with 3 steps — visible with glass cards
+- ✅ Features grid — 6 cards in DOM, verified
+- ✅ Template gallery — 6 templates in DOM, verified
+- ✅ FAQ section — rendered
+- ✅ Newsletter section — rendered
+- ✅ Pricing section — rendered
+- ✅ Footer — rendered with links
 
 ---
 
-## Bug Fix Session — 2026-04-17 (continued)
+## Previous Bug Fix Session — 2026-04-17 (Round 1)
 
-### Bugs Found & Fixed
-
-1. **🔴 page.tsx:239 — Parsing error (missing closing parenthesis)**
-   - `fetch()` call was missing `)` — the options object `}` closed but `fetch(` was never terminated
-   - **Fix**: Added `)` to properly close `fetch()` call
-
-2. **🔴 image-upload-zone.tsx:41 — Stray `n` character causing parsing error**
-   - Line 41 had an accidental `n` prefix: `n      reader.readAsDataURL(file);`
-   - This broke the entire `readFileAsBase64` function, preventing any image from being converted to base64
-   - **Fix**: Removed the stray `n` character
-
-3. **🔴 image-upload-zone.tsx:68 — Missing `url` variable in `handleDrop`**
-   - The `handleDrop` function referenced `url` without defining it (unlike `handleFileInput` which correctly creates `URL.createObjectURL(file)`)
-   - This meant drag-and-drop image upload was completely broken
-   - **Fix**: Added `const url = URL.createObjectURL(file);` before using `url`
-
-4. **🟡 analysis-results.tsx:52 — Lucide `Image` icon triggering alt-text warning**
-   - The `Image` component from lucide-react was flagged by `jsx-a11y/alt-text` ESLint rule
-   - **Fix**: Renamed import from `Image` to `ImageIcon`
-
-5. **🟠 page.tsx:239 — `runAnalysis` not processing API response**
-   - The `runAnalysis` function made a `fetch()` call to `/api/analyze` but never read the response
-   - Analysis results (prompt, promptStats, adAnalysis) were never set in state
-   - The auto-analysis feature was effectively useless — it ran but discarded results
-   - **Fix**: Added `const data = await response.json()` and set prompt, promptStats, adAnalysis on success
-
-6. **🟠 VLM API image format issue**
-   - VLM API received blob URLs (from file uploads) or relative paths (from demo images) which it couldn't parse
-   - Error: `{"error":{"code":"1210","message":"图片输入格式/解析错误"}}`
-   - **Fixes**:
-     - Client now always sends base64 data URL for uploaded images (`imageBase64 || adImageUrl`)
-     - Demo images are fetched and converted to base64 when clicked
-     - Server-side `analyze/route.ts` checks for `data:image/` prefix before attempting VLM call; skips VLM for non-base64 inputs and uses smart fallback
-     - Generate endpoint also uses `imageBase64 || adImageUrl` instead of blob URL
-
-### Verification
-- **ESLint**: ✅ Clean — zero errors, zero warnings
-- **Dev Server**: ✅ Compiling successfully, all routes 200
-
----
-
-## Previous Session Summary (v2.0 Build)
-
-### v2.0 Major Changes (Complete Rebuild)
-
-#### New Architecture
-- **3-step workflow**: Upload Ad Creative → Enter Landing Page URL → Review AI Prompt → Generate
-- **Real AI integration**: `/api/analyze` endpoint uses VLM for ad image analysis, Jina Reader for page scraping
-- **Real code generation**: `/api/generate` endpoint uses LLM (glm-4.6) to generate actual React/HTML code
-- **Auto-analysis**: When both inputs are ready, automatically runs analysis and builds prompt
-- **Prompt Builder**: Collapsible/expandable AI prompt editor with character/word count
-- **Live Preview**: Desktop/Tablet/Mobile responsive preview with viewport switching
-- **Code Viewer**: Syntax-highlighted React/HTML tabs with line numbers
-- **Export Panel**: Download as .tsx or .html, copy to clipboard, share link
-
-#### Files Created/Updated
-1. `src/lib/types.ts` — Full TypeScript type definitions
-2. `src/lib/prompt-builder.ts` — Builds detailed Stitch AI prompt
-3. `src/components/prompt-builder.tsx` — Prompt editor UI
-4. `src/components/loading-animation.tsx` — 6-step loading overlay
-5. `src/components/preview-viewer.tsx` — Live iframe preview
-6. `src/components/code-viewer.tsx` — Syntax-highlighted code viewer
-7. `src/components/export-panel.tsx` — Export options panel
-8. `src/components/analysis-results.tsx` — Ad analysis display
-9. `src/app/api/analyze/route.ts` — VLM + Jina Reader endpoint
-10. `src/app/api/generate/route.ts` — LLM code generation endpoint
-11. `src/app/page.tsx` — Complete rewrite (800+ lines)
-12. `src/components/image-upload-zone.tsx` — Bug-fixed image upload
-
-#### API Endpoints
-- `POST /api/analyze` — VLM image analysis + Jina page scraping + prompt building
-- `POST /api/generate` — LLM HTML/React code generation + quality analysis
+### Bugs Fixed (6 total)
+1. **page.tsx:239** — Missing `)` closing `fetch()` call
+2. **image-upload-zone.tsx:41** — Stray `n` character breaking base64 conversion
+3. **image-upload-zone.tsx:68** — Missing `url` variable in `handleDrop` (drag-and-drop broken)
+4. **analysis-results.tsx:52** — Lucide `Image` → `ImageIcon` rename
+5. **page.tsx:239** — `runAnalysis` not processing API response
+6. **VLM API** — Base64 image format fix for server-side analysis
 
 ---
 
 ## Unresolved Issues / Risks
 1. **Generation time** — LLM code generation takes ~49s; could be optimized with streaming
-2. **Cross-origin warning** — Next.js dev server shows cross-origin warning for preview panel (cosmetic, not functional)
+2. **Cross-origin warning** — Next.js dev server cross-origin warning for preview panel (cosmetic)
 
 ---
 
 ## Priority Recommendations for Next Phase
 1. Add streaming for code generation progress to reduce perceived wait time
-2. Add dark mode support for the results page preview iframe
-3. Implement real file upload to server with Prisma storage
-4. Add user authentication for persistent history
-5. Add A/B test comparison mode
-6. Add template gallery for different industry verticals
-7. Implement WebSocket real-time progress updates
+2. Implement WebSocket real-time progress updates during generation
+3. Add dark mode refinements for all new sections (templates, marquee, glass cards)
+4. Add A/B test comparison mode for generated results
+5. Implement real file upload to server with Prisma storage
+6. Add user authentication for persistent history
+7. Add template gallery expansion with user-created templates
 8. Performance: lazy-load below-fold sections, code splitting
 9. Add collaborative editing features
-10. More responsive design refinements and micro-animations
+10. Responsive design refinements for new sections on mobile

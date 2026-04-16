@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import { AnalysisResults } from '@/components/analysis-results';
 import { HistoryDrawer } from '@/components/history-drawer';
 import { FaqSection } from '@/components/faq-section';
 import { BackToTop } from '@/components/back-to-top';
+import { NewsletterSection } from '@/components/newsletter-section';
 import { ScrollProgress } from '@/components/scroll-progress';
 import { AnimatedCounter } from '@/components/animated-counter';
 import {
@@ -50,6 +51,12 @@ import {
   MousePointerClick,
   ChevronRight,
   RotateCcw,
+  ShoppingBag,
+  Dumbbell,
+  Building2,
+  GraduationCap,
+  Landmark,
+  MonitorSmartphone,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
@@ -131,12 +138,69 @@ const demoSamples = [
 ];
 
 const features = [
-  { icon: <Sparkles className="h-5 w-5" />, title: 'AI-Powered Analysis', description: 'Advanced vision AI understands your ad creative elements, messaging, and design language.', gradient: 'from-primary/10 to-violet-500/10' },
-  { icon: <Layers className="h-5 w-5" />, title: 'Message Matching', description: 'Identifies inconsistencies between ad promises and landing page content automatically.', gradient: 'from-violet-500/10 to-purple-500/10' },
-  { icon: <Palette className="h-5 w-5" />, title: 'Visual Alignment', description: 'Applies matching color schemes, typography, and visual hierarchy from your ads.', gradient: 'from-purple-500/10 to-pink-500/10' },
-  { icon: <BarChart3 className="h-5 w-5" />, title: 'Quality Scoring', description: 'Get a detailed quality score with actionable insights to improve ad-page consistency.', gradient: 'from-pink-500/10 to-rose-500/10' },
-  { icon: <Shield className="h-5 w-5" />, title: 'Trust Signals', description: 'Automatically adds social proof, security badges, and credibility elements.', gradient: 'from-rose-500/10 to-orange-500/10' },
-  { icon: <Zap className="h-5 w-5" />, title: 'Instant Results', description: 'Generate production-ready personalized code in under 10 seconds.', gradient: 'from-orange-500/10 to-amber-500/10' },
+  { icon: <Sparkles className="h-5 w-5" />, title: 'AI-Powered Analysis', description: 'Advanced vision AI understands your ad creative elements, messaging, and design language.', iconBg: 'bg-gradient-to-br from-violet-500/20 to-purple-500/20 text-violet-600 dark:text-violet-400' },
+  { icon: <Layers className="h-5 w-5" />, title: 'Message Matching', description: 'Identifies inconsistencies between ad promises and landing page content automatically.', iconBg: 'bg-gradient-to-br from-purple-500/20 to-pink-500/20 text-purple-600 dark:text-purple-400' },
+  { icon: <Palette className="h-5 w-5" />, title: 'Visual Alignment', description: 'Applies matching color schemes, typography, and visual hierarchy from your ads.', iconBg: 'bg-gradient-to-br from-pink-500/20 to-rose-500/20 text-pink-600 dark:text-pink-400' },
+  { icon: <BarChart3 className="h-5 w-5" />, title: 'Quality Scoring', description: 'Get a detailed quality score with actionable insights to improve ad-page consistency.', iconBg: 'bg-gradient-to-br from-rose-500/20 to-orange-500/20 text-rose-600 dark:text-rose-400' },
+  { icon: <Shield className="h-5 w-5" />, title: 'Trust Signals', description: 'Automatically adds social proof, security badges, and credibility elements.', iconBg: 'bg-gradient-to-br from-orange-500/20 to-amber-500/20 text-orange-600 dark:text-orange-400' },
+  { icon: <Zap className="h-5 w-5" />, title: 'Instant Results', description: 'Generate production-ready personalized code in under 10 seconds.', iconBg: 'bg-gradient-to-br from-amber-500/20 to-emerald-500/20 text-amber-600 dark:text-amber-400' },
+];
+
+const templates = [
+  {
+    id: 'saas' as const,
+    industry: 'SaaS',
+    title: 'SaaS Product Page',
+    description: 'High-converting SaaS hero with feature highlights and CTA',
+    colors: ['#6366f1', '#8b5cf6', '#a855f7'],
+    icon: <MonitorSmartphone className="h-5 w-5" />,
+    prompt: 'Generate a modern SaaS product landing page hero section with gradient background, feature grid preview, social proof metrics, and a strong CTA button. Use a professional blue-purple color scheme.',
+  },
+  {
+    id: 'ecommerce' as const,
+    industry: 'E-commerce',
+    title: 'Product Launch',
+    description: 'E-commerce hero with product showcase and urgency',
+    colors: ['#f43f5e', '#ec4899', '#a855f7'],
+    icon: <ShoppingBag className="h-5 w-5" />,
+    prompt: 'Generate an e-commerce product launch hero section with large product image area, promotional pricing badge, countdown timer element, customer reviews snippet, and add-to-cart CTA. Use vibrant, energetic colors.',
+  },
+  {
+    id: 'fitness' as const,
+    industry: 'Fitness',
+    title: 'Fitness App',
+    description: 'Energetic fitness landing with transformation focus',
+    colors: ['#10b981', '#06b6d4', '#3b82f6'],
+    icon: <Dumbbell className="h-5 w-5" />,
+    prompt: 'Generate a fitness app landing page hero section with energetic gradients, before/after transformation preview, workout stats display, testimonials, and download CTA. Use dynamic green-blue tones.',
+  },
+  {
+    id: 'realestate' as const,
+    industry: 'Real Estate',
+    title: 'Property Listing',
+    description: 'Luxury real estate hero with property showcase',
+    colors: ['#d97706', '#b45309', '#92400e'],
+    icon: <Building2 className="h-5 w-5" />,
+    prompt: 'Generate a luxury real estate landing page hero section with property image showcase, neighborhood highlights, pricing display, virtual tour CTA, and agent contact info. Use warm, premium gold tones.',
+  },
+  {
+    id: 'education' as const,
+    industry: 'Education',
+    title: 'Online Course',
+    description: 'Educational landing with course benefits and enrollment',
+    colors: ['#0ea5e9', '#6366f1', '#8b5cf6'],
+    icon: <GraduationCap className="h-5 w-5" />,
+    prompt: 'Generate an online education platform hero section with course benefits, instructor credentials, student testimonials, enrollment CTA, and learning outcomes. Use trustworthy blue-purple tones.',
+  },
+  {
+    id: 'finance' as const,
+    industry: 'Finance',
+    title: 'FinTech App',
+    description: 'Professional finance landing with trust signals',
+    colors: ['#059669', '#0d9488', '#0891b2'],
+    icon: <Landmark className="h-5 w-5" />,
+    prompt: 'Generate a fintech/finance app landing page hero section with security badges, performance metrics, trust indicators, demo CTA, and regulatory compliance notices. Use professional green-teal tones.',
+  },
 ];
 
 const howItWorks = [
@@ -167,10 +231,6 @@ export default function Home() {
   const [generationResult, setGenerationResult] = useState<StitchGenerationResult | null>(null);
   const { theme, setTheme } = useTheme();
   const generateRef = useRef<HTMLDivElement>(null);
-
-  const { scrollYProgress } = useScroll();
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
-  const heroScale = useTransform(scrollYProgress, [0, 0.15], [1, 0.97]);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -370,6 +430,18 @@ export default function Home() {
     toast.info('URL loaded from history');
   }, []);
 
+  const handleUseTemplate = useCallback((template: typeof templates[number]) => {
+    setPrompt(template.prompt);
+    setPromptStats({
+      characters: template.prompt.length,
+      words: template.prompt.split(/\s+/).length,
+      estimatedReadingTime: Math.ceil(template.prompt.split(/\s+/).length / 200),
+    });
+    setAdAnalysis(null);
+    generateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    toast.success(`${template.industry} template loaded! Review the prompt below.`);
+  }, []);
+
   const getScoreColor = (score: number) => {
     if (score >= 90) return 'text-green-500';
     if (score >= 70) return 'text-amber-500';
@@ -449,27 +521,29 @@ export default function Home() {
               {/* Hero Section */}
               <section className="relative overflow-hidden">
                 <div className="absolute inset-0 overflow-hidden pointer-events-none noise-overlay gradient-mesh">
-                  <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-float" />
-                  <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-violet-400/5 rounded-full blur-3xl animate-float-delayed" />
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-gradient-to-r from-primary/3 to-violet-400/3 rounded-full blur-3xl animate-float-slow" />
-                  {[...Array(6)].map((_, i) => (
+                  <div className="mesh-orb absolute -top-32 -right-32 w-[500px] h-[500px] bg-violet-500 opacity-[0.12]" style={{ animation: 'mesh-orb-1 12s ease-in-out infinite' }} />
+                  <div className="mesh-orb absolute -bottom-32 -left-32 w-[400px] h-[400px] bg-purple-500 opacity-[0.10]" style={{ animation: 'mesh-orb-2 16s ease-in-out 2s infinite' }} />
+                  <div className="mesh-orb absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary opacity-[0.08]" style={{ animation: 'mesh-orb-3 20s ease-in-out 4s infinite' }} />
+                  <div className="mesh-orb absolute top-1/4 right-1/4 w-[300px] h-[300px] bg-pink-500 opacity-[0.06]" style={{ animation: 'mesh-orb-1 14s ease-in-out 6s infinite' }} />
+                  <div className="mesh-orb absolute bottom-1/4 left-1/3 w-[350px] h-[350px] bg-violet-400 opacity-[0.07]" style={{ animation: 'mesh-orb-2 18s ease-in-out 1s infinite' }} />
+                  {[...Array(8)].map((_, i) => (
                     <div
                       key={i}
-                      className="particle absolute w-2 h-2 rounded-full bg-primary/20"
+                      className="particle absolute w-2 h-2 rounded-full bg-primary/25"
                       style={{
-                        left: `${15 + i * 14}%`,
-                        top: `${20 + (i % 3) * 25}%`,
-                        '--drift-x': `${(i % 2 === 0 ? 1 : -1) * (30 + i * 15)}px`,
-                        '--drift-y': `${-40 - i * 20}px`,
-                        '--duration': `${12 + i * 3}s`,
-                        '--delay': `${i * 2}s`,
+                        left: `${10 + i * 11}%`,
+                        top: `${15 + (i % 4) * 20}%`,
+                        '--drift-x': `${(i % 2 === 0 ? 1 : -1) * (30 + i * 18)}px`,
+                        '--drift-y': `${-40 - i * 22}px`,
+                        '--duration': `${10 + i * 2.5}s`,
+                        '--delay': `${i * 1.5}s`,
                       } as React.CSSProperties}
                     />
                   ))}
-                  <div className="absolute inset-0 dot-pattern opacity-30" />
+                  <div className="absolute inset-0 dot-pattern opacity-25" />
                 </div>
 
-                <motion.div style={{ opacity: heroOpacity, scale: heroScale }} className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-24 pb-12">
+                <motion.div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-24 pb-12">
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex justify-center mb-8">
                     <Badge variant="secondary" className="gap-1.5 px-4 py-1.5 text-xs font-medium cursor-pointer hover:bg-secondary/80 transition-colors shadow-sm">
                       <Sparkles className="h-3.5 w-3.5 text-primary" />
@@ -560,10 +634,16 @@ export default function Home() {
 
                     {/* Keyboard shortcut hint */}
                     {canGenerate && (
-                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1.5">
-                        <Keyboard className="h-3 w-3" />
-                        Press <kbd className="px-1.5 py-0.5 rounded border border-border/60 bg-muted/50 text-[10px] font-mono">Ctrl</kbd> + <kbd className="px-1.5 py-0.5 rounded border border-border/60 bg-muted/50 text-[10px] font-mono">Enter</kbd> to generate
-                      </motion.p>
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center justify-center pt-2">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-full border border-border/40">
+                          <Keyboard className="h-3.5 w-3.5 text-primary/60" />
+                          <span>Press</span>
+                          <kbd className="keyboard-key">Ctrl</kbd>
+                          <span>+</span>
+                          <kbd className="keyboard-key">Enter</kbd>
+                          <span>to generate</span>
+                        </div>
+                      </motion.div>
                     )}
 
                     {/* Demo Samples */}
@@ -595,6 +675,24 @@ export default function Home() {
                 </motion.div>
               </section>
 
+              {/* Brand Logo Marquee */}
+              <section className="py-10 border-y border-border/30 bg-muted/5 relative overflow-hidden">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                  <p className="text-center text-xs font-medium text-muted-foreground uppercase tracking-widest mb-6">Trusted by 2,500+ teams worldwide</p>
+                  <div className="relative overflow-hidden">
+                    <div className="flex animate-marquee">
+                      {[...brandLogos, ...brandLogos].map((logo, i) => (
+                        <div key={`${logo}-${i}`} className="glass-card mx-3 px-5 py-2.5 rounded-xl flex-shrink-0 flex items-center justify-center min-w-[120px]">
+                          <span className="text-sm font-semibold text-muted-foreground/70 whitespace-nowrap select-none">{logo}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-background to-transparent pointer-events-none z-10" />
+                    <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-background to-transparent pointer-events-none z-10" />
+                  </div>
+                </div>
+              </section>
+
               {/* Stats Section */}
               <section className="py-16 bg-gradient-to-b from-transparent via-primary/5 to-transparent">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -619,13 +717,13 @@ export default function Home() {
                   </motion.div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {features.map((feature, i) => (
-                      <motion.div key={feature.title} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.08 }}>
-                        <Card className="card-shine h-full hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-border/60">
-                          <CardContent className="p-6">
-                            <div className={cn('w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center mb-4', feature.gradient, 'text-primary')}>
+                      <motion.div key={feature.title} initial={{ opacity: 0, y: 30, scale: 0.95 }} whileInView={{ opacity: 1, y: 0, scale: 1 }} viewport={{ once: true }} transition={{ delay: i * 0.1, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}>
+                        <Card className="glass-card feature-card h-full cursor-default group">
+                          <CardContent className="p-6 relative z-[1]">
+                            <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110', feature.iconBg)}>
                               {feature.icon}
                             </div>
-                            <h3 className="font-semibold mb-2">{feature.title}</h3>
+                            <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors">{feature.title}</h3>
                             <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
                           </CardContent>
                         </Card>
@@ -644,23 +742,32 @@ export default function Home() {
                     <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Three simple steps</h2>
                     <p className="text-muted-foreground max-w-2xl mx-auto text-lg">From ad creative to personalized landing page in seconds.</p>
                   </motion.div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-0">
                     {howItWorks.map((item, i) => (
-                      <motion.div key={item.step} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.15 }}>
-                        <div className="relative text-center">
-                          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-violet-500 text-white mb-6 shadow-lg shadow-primary/20">
-                            {item.icon}
-                          </div>
-                          <div className="absolute -top-2 -left-2 md:left-4 lg:left-8 text-5xl font-black text-primary/10">{item.step}</div>
-                          <h3 className="text-lg font-bold mb-3">{item.title}</h3>
-                          <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">{item.description}</p>
-                          {i < howItWorks.length - 1 && (
-                            <div className="hidden md:block absolute top-8 -right-4 w-8 text-muted-foreground/30">
-                              <ChevronRight className="h-6 w-6" />
+                      <React.Fragment key={item.step}>
+                        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.2, duration: 0.5 }} className="flex-1 max-w-xs">
+                          <div className="gradient-border-hover rounded-2xl p-6 text-center bg-card">
+                            <div className="relative inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary to-violet-500 text-white mb-5 glow-step">
+                              {item.icon}
+                              <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-background border-2 border-primary text-primary text-[10px] font-bold flex items-center justify-center shadow-sm">{item.step}</span>
                             </div>
-                          )}
-                        </div>
-                      </motion.div>
+                            <h3 className="text-lg font-bold mb-3">{item.title}</h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
+                          </div>
+                        </motion.div>
+                        {i < howItWorks.length - 1 && (
+                          <div className="hidden md:block flex-shrink-0">
+                            <div className="step-connector w-16 lg:w-24" />
+                          </div>
+                        )}
+                        {i < howItWorks.length - 1 && (
+                          <div className="md:hidden flex-shrink-0">
+                            <div className="w-[2px] h-8 bg-gradient-to-b from-primary/30 to-primary/10 mx-auto relative">
+                              <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-primary/30" />
+                            </div>
+                          </div>
+                        )}
+                      </React.Fragment>
                     ))}
                   </div>
                 </div>
@@ -678,23 +785,34 @@ export default function Home() {
                     <AnimatePresence mode="wait">
                       <motion.div
                         key={testimonialIndex}
-                        initial={{ opacity: 0, x: 50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -50 }}
-                        transition={{ duration: 0.4 }}
+                        initial={{ opacity: 0, x: 60, scale: 0.98 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, x: -60, scale: 0.98 }}
+                        transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
                       >
-                        <Card className="border-border/60 shadow-lg">
-                          <CardContent className="p-8 sm:p-10 text-center">
+                        <Card className="frosted-glass-card overflow-hidden">
+                          <CardContent className="p-8 sm:p-10 text-center relative">
+                            {/* Quote mark decoration */}
+                            <div className="absolute top-4 left-6 sm:left-8 quote-mark" aria-hidden="true">&ldquo;</div>
+                            <div className="absolute bottom-4 right-6 sm:right-8 quote-mark rotate-180" aria-hidden="true">&ldquo;</div>
+
                             <div className="flex items-center justify-center gap-1 mb-6">
                               {[...Array(testimonials[testimonialIndex].rating)].map((_, i) => (
-                                <Star key={i} className="h-5 w-5 fill-amber-400 text-amber-400" />
+                                <motion.div
+                                  key={i}
+                                  initial={{ opacity: 0, y: 8 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: i * 0.05 }}
+                                >
+                                  <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
+                                </motion.div>
                               ))}
                             </div>
-                            <blockquote className="text-lg sm:text-xl font-medium leading-relaxed mb-8 max-w-2xl mx-auto">
+                            <blockquote className="text-lg sm:text-xl font-medium leading-relaxed mb-8 max-w-2xl mx-auto relative z-[1]">
                               &ldquo;{testimonials[testimonialIndex].content}&rdquo;
                             </blockquote>
-                            <div className="flex items-center justify-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-violet-400 flex items-center justify-center text-white text-sm font-bold">
+                            <div className="flex items-center justify-center gap-3 relative z-[1]">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-violet-400 flex items-center justify-center text-white text-sm font-bold shadow-lg shadow-primary/20">
                                 {testimonials[testimonialIndex].avatar}
                               </div>
                               <div className="text-left">
@@ -714,11 +832,54 @@ export default function Home() {
                           onClick={() => setTestimonialIndex(i)}
                           className={cn(
                             'w-2 h-2 rounded-full transition-all duration-300',
-                            i === testimonialIndex ? 'w-6 bg-primary' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
+                            i === testimonialIndex ? 'w-6 bg-primary shadow-sm shadow-primary/30' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
                           )}
+                          aria-label={`Show testimonial ${i + 1}`}
                         />
                       ))}
                     </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Template Gallery */}
+              <section id="templates" className="py-20 sm:py-28">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                  <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
+                    <Badge variant="secondary" className="mb-4 text-xs px-3 py-1"><Code2 className="h-3 w-3 mr-1" />Templates</Badge>
+                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Start with a template</h2>
+                    <p className="text-muted-foreground max-w-2xl mx-auto text-lg">Choose from industry-specific templates to get started faster. Click to pre-fill the AI prompt.</p>
+                  </motion.div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {templates.map((template, i) => (
+                      <motion.div key={template.id} initial={{ opacity: 0, y: 25, scale: 0.96 }} whileInView={{ opacity: 1, y: 0, scale: 1 }} viewport={{ once: true }} transition={{ delay: i * 0.08, duration: 0.45 }}>
+                        <Card className="glass-card template-card h-full cursor-pointer group" onClick={() => handleUseTemplate(template)}>
+                          <CardContent className="p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="flex gap-1.5">
+                                {template.colors.map((color) => (
+                                  <div
+                                    key={color}
+                                    className="w-6 h-6 rounded-md shadow-sm ring-1 ring-black/5 dark:ring-white/10 transition-transform duration-300 group-hover:scale-110"
+                                    style={{ backgroundColor: color }}
+                                  />
+                                ))}
+                              </div>
+                              <Badge variant="secondary" className="text-[10px] ml-auto">{template.industry}</Badge>
+                            </div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">{template.icon}</div>
+                              <h3 className="font-semibold">{template.title}</h3>
+                            </div>
+                            <p className="text-sm text-muted-foreground leading-relaxed mb-4">{template.description}</p>
+                            <div className="flex items-center gap-1.5 text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                              Use Template
+                              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))}
                   </div>
                 </div>
               </section>
@@ -739,13 +900,15 @@ export default function Home() {
                     </div>
                   </motion.div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                     {pricingPlans.map((plan, i) => (
-                      <motion.div key={plan.name} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }}>
-                        <Card className={cn('h-full relative', plan.popular && 'border-primary/50 shadow-xl shadow-primary/10')}>
+                      <motion.div key={plan.name} initial={{ opacity: 0, y: 25, scale: 0.97 }} whileInView={{ opacity: 1, y: 0, scale: 1 }} viewport={{ once: true }} transition={{ delay: i * 0.1, duration: 0.5 }}>
+                        <Card className={cn('pricing-card h-full relative overflow-hidden', plan.popular && 'popular-card border-primary/40 shadow-lg shadow-primary/10')}>
                           {plan.popular && (
-                            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                              <Badge className="bg-gradient-to-r from-primary to-violet-500 text-white border-0 text-xs px-3">Most Popular</Badge>
+                            <div className="pricing-ribbon">
+                              <div className="pricing-ribbon-inner relative shimmer-badge text-white">
+                                Most Popular
+                              </div>
                             </div>
                           )}
                           <CardContent className="p-6">
@@ -757,14 +920,14 @@ export default function Home() {
                               </span>
                               {plan.period && <span className="text-muted-foreground text-sm">{plan.period}</span>}
                             </div>
-                            <Button variant={plan.popular ? 'default' : 'outline'} className={cn('w-full mb-6', plan.popular && 'bg-gradient-to-r from-primary to-violet-500 hover:shadow-lg hover:shadow-primary/25')}>
+                            <Button variant={plan.popular ? 'default' : 'outline'} className={cn('w-full mb-6 rounded-xl', plan.popular && 'bg-gradient-to-r from-primary to-violet-500 hover:shadow-lg hover:shadow-primary/25 text-white')}>
                               {plan.cta}
                             </Button>
                             <Separator className="mb-4" />
                             <ul className="space-y-2.5">
-                              {plan.features.map((feature) => (
+                              {plan.features.map((feature, fi) => (
                                 <li key={feature} className="flex items-start gap-2 text-sm">
-                                  <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                                  <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5 check-animate" style={{ animationDelay: `${i * 0.1 + fi * 0.05}s` }} />
                                   <span className="text-muted-foreground">{feature}</span>
                                 </li>
                               ))}
@@ -779,6 +942,9 @@ export default function Home() {
 
               {/* FAQ */}
               <FaqSection />
+
+              {/* Newsletter */}
+              <NewsletterSection />
 
               {/* CTA Section */}
               <section className="py-20 sm:py-28">
