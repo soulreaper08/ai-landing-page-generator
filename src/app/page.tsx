@@ -212,7 +212,15 @@ export default function Home() {
     setPrompt('');
     setPromptStats(undefined);
     setAdAnalysis(null);
-    setImageBase64(null);
+    // Fetch demo image and convert to base64 for VLM analysis
+    fetch(imageUrl)
+      .then((res) => res.blob())
+      .then((blob) => {
+        const reader = new FileReader();
+        reader.onload = () => setImageBase64(reader.result as string);
+        reader.readAsDataURL(blob);
+      })
+      .catch(() => setImageBase64(null));
     toast.success('Demo loaded! Click Generate to see it in action.');
   }, []);
 
@@ -236,6 +244,13 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adImage: imageBase64 || adImageUrl, pageUrl }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setPrompt(data.prompt || '');
+        setPromptStats(data.promptStats);
+        setAdAnalysis(data.adAnalysis);
+        toast.success('Analysis complete!');
       }
     } catch {
       // Analysis failed — user can still generate with defaults
@@ -264,7 +279,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: prompt || 'Generate a personalized hero section',
-          adImage: adImageUrl,
+          adImage: imageBase64 || adImageUrl,
           pageUrl,
         }),
       });

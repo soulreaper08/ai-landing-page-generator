@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
-import { Palette, Type, MessageSquare, Lightbulb, Sparkles, Image, Tag } from 'lucide-react';
+import { Palette, Type, MessageSquare, Lightbulb, Sparkles, ImageIcon, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AdAnalysisResult } from '@/lib/types';
 
@@ -49,7 +49,7 @@ export function AnalysisResults({ analysis }: AnalysisResultsProps) {
       <Card className="border-border/60 overflow-hidden">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Image className="h-4 w-4 text-primary" />
+            <ImageIcon className="h-4 w-4 text-primary" />
             Ad Analysis Results
             <Badge variant="secondary" className="text-[10px] ml-auto">
               <Sparkles className="h-3 w-3 mr-1 text-primary" />

@@ -38,7 +38,7 @@ export function ImageUploadZone({ onImageSelect, previewUrl, disabled }: ImageUp
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
-n      reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
     });
   };
 
@@ -65,6 +65,7 @@ n      reader.readAsDataURL(file);
     if (files && files.length > 0) {
       const file = files[0];
       if (file.type.startsWith('image/')) {
+        const url = URL.createObjectURL(file);
         readFileAsBase64(file).then((base64) => onImageSelect(file, url, base64)).catch(() => onImageSelect(file, url));
       }
     }

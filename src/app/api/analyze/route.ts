@@ -28,12 +28,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 1: Analyze ad image via VLM
+    // Step 1: Analyze ad image via VLM (only if base64 data URL is provided)
     let adAnalysis: AdAnalysisResult;
-    try {
-      adAnalysis = await analyzeAdImageWithVLM(adImage);
-    } catch {
-      console.warn('[Analyze] VLM analysis failed, using smart fallback');
+    const isBase64Image = adImage.startsWith('data:image/');
+    if (isBase64Image) {
+      try {
+        adAnalysis = await analyzeAdImageWithVLM(adImage);
+      } catch {
+        console.warn('[Analyze] VLM analysis failed, using smart fallback');
+        adAnalysis = buildFallbackAdAnalysis(adImage);
+      }
+    } else {
+      console.warn('[Analyze] Image is not base64, skipping VLM — using smart fallback');
       adAnalysis = buildFallbackAdAnalysis(adImage);
     }
 
