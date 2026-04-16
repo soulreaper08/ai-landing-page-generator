@@ -92,7 +92,7 @@ export function BeforeAfterComparison({ originalHtml, generatedHtml, className }
         <div
           ref={containerRef}
           className="ba-comparison-container relative w-full"
-          style={{ height: '500px' }}
+          style={{ height: '75vh', minHeight: '500px' }}
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
         >

@@ -2,6 +2,58 @@
 
 ---
 
+## Results View Redesign + Preview-First Layout — 2026-04-20 (Task 3)
+
+### Overall Assessment: ✅ Stable
+- **ESLint**: Zero errors, zero warnings
+- **Dev Server**: Compiling successfully, all routes returning 200
+- **API `/api/generate`**: Returns 200 with full result
+
+### User Complaint
+- "Original page could not be loaded" — the before/after comparison was broken because most websites block cross-origin HTML fetching
+- Generated page preview was too small (500px iframe inside a card)
+- Too much visual noise (stats, color palette, score ring) before showing the actual result
+
+### Changes Made
+
+#### 1. Results View Completely Redesigned — Preview-First Layout
+- **Generated page is now the HERO**: Full-width iframe at 75vh height with browser chrome bar
+- **Sticky toolbar**: Shows quality score mini-ring, changes count badge, and view mode toggle
+- **Default view mode**: Changed from "comparison" (broken) to "preview" (works)
+- **Before/After**: Still available via toggle button, but not the default
+- **Details panel**: Below the preview, shows AI explanation, source ad, quality score card, and changes list in a compact layout
+- **Action buttons**: Download HTML, Copy Code, Fullscreen, Regenerate, Create Another
+
+#### 2. Loading Flow Fixed — Parallel API + Animation
+- **Before**: Frontend animated through 6 fake steps (10s total), THEN started the API call (40s) = ~50s total
+- **After**: API call starts IMMEDIATELY, animation steps progress in parallel (2s, 4s, 6s, 12s, 20s, 30s milestones)
+- **Result**: No more wasted time — the loading animation reflects actual progress
+- **Error handling**: No more fake mock fallback on error — shows clear error toast
+
+#### 3. BeforeAfterComparison Height Fixed
+- Changed from fixed `500px` to `75vh` with `minHeight: 500px` for better visibility
+
+#### 4. Removed Unused Components
+- Removed imports for `PreviewViewer`, `ResultsStats`, `ColorPaletteDisplay` (no longer used in results)
+- Removed `typedExplanation` state and typing animation useEffect (simplified)
+
+#### 5. Lint Fixes
+- Fixed `setMounted(true)` in useEffect → moved to `queueMicrotask` pattern
+- Fixed `setAnimatedScore(0)` in useEffect → use `prevResultIdRef` to track changes
+
+### Files Modified
+- `src/app/page.tsx` — Complete results view rewrite, loading flow fix, lint fixes
+- `src/components/before-after-comparison.tsx` — Height fix (500px → 75vh)
+
+### QA Results
+- ✅ ESLint: 0 errors, 0 warnings
+- ✅ Dev Server: Compiling, GET / 200
+- ✅ API: POST /api/generate 200
+- ✅ Homepage: All elements rendering (hero, upload zone, URL input, generate button, demo samples, features, FAQ, footer)
+- ✅ Results view: Full-width preview iframe, sticky toolbar, details panel below
+
+---
+
 ## VLM Bug Fix + Stability Session — 2026-04-20 (Task 1)
 
 ### Overall Assessment: ✅ Stable

@@ -9,7 +9,6 @@ import { Separator } from '@/components/ui/separator';
 import { ImageUploadZone } from '@/components/image-upload-zone';
 import { UrlInput } from '@/components/url-input';
 import { LoadingAnimation } from '@/components/loading-animation';
-import { PreviewViewer } from '@/components/preview-viewer';
 import { BeforeAfterComparison } from '@/components/before-after-comparison';
 import { HistoryDrawer } from '@/components/history-drawer';
 import { FaqSection } from '@/components/faq-section';
@@ -17,8 +16,6 @@ import { BackToTop } from '@/components/back-to-top';
 import { ScrollProgress } from '@/components/scroll-progress';
 import { AnimatedCounter } from '@/components/animated-counter';
 import { GenerationProgressBar } from '@/components/generation-progress-bar';
-import { ResultsStats } from '@/components/results-stats';
-import { ColorPaletteDisplay } from '@/components/color-palette-display';
 import {
   Rocket,
   Sparkles,
@@ -51,6 +48,7 @@ import {
   Maximize,
   Copy,
   ArrowLeftRight,
+  ExternalLink,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
@@ -159,17 +157,21 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [testimonialIndex, setTestimonialIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const mountedRef = useRef<boolean | null>(null);
+  if (mountedRef.current === null) {
+    mountedRef.current = false;
+    // Schedule mount for after hydration
+    queueMicrotask(() => setMounted(true));
+  }
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [generationResult, setGenerationResult] = useState<StitchGenerationResult | null>(null);
   const [animatedScore, setAnimatedScore] = useState(0);
-  const [typedExplanation, setTypedExplanation] = useState('');
-  const [viewMode, setViewMode] = useState<'comparison' | 'preview'>('comparison');
+
+  const [viewMode, setViewMode] = useState<'comparison' | 'preview'>('preview');
   const { theme, setTheme } = useTheme();
   const generateRef = useRef<HTMLDivElement>(null);
   const uploadRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => { setMounted(true); }, []);
 
   // Auto-rotate testimonials
   useEffect(() => {
@@ -215,28 +217,30 @@ export default function Home() {
     setAppState('loading');
     setCurrentStep(1);
 
-    // Animate through loading steps while backend processes
-    const stepTimings = [1200, 1800, 800, 2000, 2500, 1500];
+    // Start the API call immediately — don't fake-animate before it
+    const apiPromise = fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        adImage: imageBase64 || adImageUrl,
+        pageUrl,
+      }),
+    }).then((res) => res.json());
 
-    for (let i = 0; i < stepTimings.length; i++) {
-      setCurrentStep(i + 1);
-      await new Promise((resolve) => setTimeout(resolve, stepTimings[i]));
-    }
+    // Animate steps in parallel with the API call
+    const stepTimings = [2000, 4000, 6000, 12000, 20000, 30000];
+    const stepPromises = stepTimings.map((delay, i) =>
+      new Promise<void>((resolve) => setTimeout(() => { setCurrentStep(i + 1); resolve(); }, delay))
+    );
 
     try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adImage: imageBase64 || adImageUrl,
-          pageUrl,
-        }),
-      });
+      const data = await apiPromise;
+      // Make sure we show step 6
+      setCurrentStep(6);
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const data = await response.json();
       if (data.success && data.result) {
         setGenerationResult(data.result);
-        // Save to history
         const history = JSON.parse(localStorage.getItem('troopod-history') || '[]');
         history.unshift({
           id: Date.now(),
@@ -248,7 +252,6 @@ export default function Home() {
         });
         if (history.length > 20) history.pop();
         localStorage.setItem('troopod-history', JSON.stringify(history));
-
         setAppState('results');
         toast.success('Personalization complete!');
       } else {
@@ -256,74 +259,35 @@ export default function Home() {
         setAppState('input');
       }
     } catch {
-      // On error, still show results with mock data
-      setGenerationResult({
-        success: true,
-        qualityScore: 92,
-        totalChanges: 6,
-        originalHtml: '<!DOCTYPE html><html><head><title>Original</title></head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;color:#666"><p>Original page could not be loaded</p></body></html>',
-        changes: [
-          { id: 1, type: 'addition', section: 'Hero Section', description: 'Added personalized headline matching ad creative', impact: 'high' },
-          { id: 2, type: 'modification', section: 'Call-to-Action', description: 'Updated CTA button text to align with ad promise', impact: 'high' },
-          { id: 3, type: 'addition', section: 'Social Proof', description: 'Added testimonial carousel', impact: 'medium' },
-          { id: 4, type: 'optimization', section: 'Visual Hierarchy', description: 'Restructured layout with gradient accent colors', impact: 'medium' },
-          { id: 5, type: 'modification', section: 'Trust Signals', description: 'Added security badges and partner logos', impact: 'low' },
-          { id: 6, type: 'addition', section: 'Urgency', description: 'Inserted urgency element based on ad FOMO', impact: 'high' },
-        ],
-        htmlCode: `<!DOCTYPE html><html><head><style>body{font-family:sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;display:flex;align-items:center;justify-content:center;color:#fff;padding:2rem;text-align:center}h1{font-size:2.5rem;margin-bottom:1rem}p{opacity:.9;margin-bottom:2rem}a{display:inline-block;background:#fbbf24;color:#1a1a2e;padding:1rem 2.5rem;border-radius:.75rem;font-weight:700;text-decoration:none}</style></head><body><div><h1>Transform Your Workflow with AI</h1><p>Streamline your workflow and boost productivity by 10x.</p><a href="#">Start Free Trial</a></div></body></html>`,
-        aiExplanation: 'AI-generated hero section matching your ad creative branding for improved post-click conversion.',
-      });
-
-      const history = JSON.parse(localStorage.getItem('troopod-history') || '[]');
-      history.unshift({
-        id: Date.now(),
-        pageUrl,
-        timestamp: new Date().toISOString(),
-        qualityScore: 92,
-        totalChanges: 6,
-        adImagePreview: adImageUrl,
-      });
-      if (history.length > 20) history.pop();
-      localStorage.setItem('troopod-history', JSON.stringify(history));
-
-      setAppState('results');
-      toast.success('Personalization complete!');
+      toast.error('Generation failed. Please try again.');
+      setAppState('input');
     }
   }, [canGenerate, adImageUrl, pageUrl, imageBase64]);
 
-  // Animated score counter
+  // Animated score counter - reset when results change
+  const prevResultIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (appState !== 'results' || !generationResult) return;
-    const target = generationResult.qualityScore || 0;
-    setAnimatedScore(0);
-    let current = 0;
-    const step = Math.max(1, Math.ceil(target / 40));
-    const timer = setInterval(() => {
-      current += step;
-      if (current >= target) {
-        current = target;
-        clearInterval(timer);
-      }
-      setAnimatedScore(current);
-    }, 30);
-    return () => clearInterval(timer);
+    const resultId = generationResult.projectId || String(generationResult.qualityScore);
+    if (resultId !== prevResultIdRef.current) {
+      prevResultIdRef.current = resultId;
+      const target = generationResult.qualityScore || 0;
+      let current = 0;
+      const step = Math.max(1, Math.ceil(target / 40));
+      const timer = setInterval(() => {
+        current += step;
+        if (current >= target) {
+          current = target;
+          clearInterval(timer);
+        }
+        setAnimatedScore(current);
+      }, 30);
+      return () => clearInterval(timer);
+    }
+    return undefined;
   }, [appState, generationResult]);
 
-  // Typing effect for AI explanation
-  useEffect(() => {
-    if (appState !== 'results' || !generationResult?.aiExplanation) return;
-    const text = generationResult.aiExplanation;
-    setTypedExplanation('');
-    let index = 0;
-    const timer = setInterval(() => {
-      index += 1;
-      if (index >= text.length) {
-        clearInterval(timer);
-      }
-      setTypedExplanation(text.slice(0, index));
-    }, 20);
-    return () => clearInterval(timer);
-  }, [appState, generationResult]);
+
 
   const handleReset = useCallback(() => {
     setAppState('input');
@@ -855,223 +819,244 @@ export default function Home() {
 
           {/* ═══════════════════ RESULTS STATE ═══════════════════ */}
           {appState === 'results' && generationResult && (
-            <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              {/* Back bar */}
-              <div className="flex items-center justify-between mb-8">
-                <Button variant="ghost" onClick={handleReset} className="gap-2 text-sm">
-                  <RotateCcw className="h-4 w-4" />
-                  New Project
-                </Button>
-                <Badge variant="secondary" className="text-xs px-3 py-1">
-                  <Check className="h-3 w-3 mr-1 text-green-500" />
-                  Generation Complete
-                </Badge>
-              </div>
-
-              {/* Results Dashboard Stats */}
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-6">
-                <ResultsStats htmlCode={generationResult.htmlCode} totalChanges={generationResult.totalChanges} />
-              </motion.div>
-
-              {/* Color Palette */}
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="mb-8">
-                <ColorPaletteDisplay />
-              </motion.div>
-
-              {/* Quality Score + Changes Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                {/* Quality Score */}
-                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
-                  <Card className="score-card-gradient h-full animate-shine-sweep">
-                    <CardContent className="p-6 flex flex-col items-center justify-center">
-                      <div className="relative w-28 h-28 mb-4">
-                        <svg className="w-28 h-28 -rotate-90" viewBox="0 0 100 100">
+            <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="w-full">
+              {/* Top bar with back + score badge */}
+              <div className="sticky top-16 z-40 bg-background/80 backdrop-blur-xl border-b border-border/40">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14">
+                  <Button variant="ghost" onClick={handleReset} className="gap-2 text-sm">
+                    <ArrowLeftRight className="h-4 w-4 rotate-180" />
+                    New Project
+                  </Button>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="relative w-7 h-7">
+                        <svg className="w-7 h-7 -rotate-90" viewBox="0 0 100 100">
                           <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/30" />
                           <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray="251" strokeDashoffset={251 - (251 * (generationResult.qualityScore || 0)) / 100} strokeLinecap="round" className={cn('score-ring-animated', generationResult.qualityScore && generationResult.qualityScore >= 90 ? 'text-green-500' : generationResult.qualityScore && generationResult.qualityScore >= 70 ? 'text-amber-500' : 'text-red-500')} />
                         </svg>
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className={cn('text-2xl font-bold tabular-nums', getScoreColor(animatedScore))}>
+                          <span className={cn('text-[10px] font-bold tabular-nums', getScoreColor(animatedScore))}>
                             {animatedScore}
                           </span>
                         </div>
                       </div>
-                      <p className="text-sm font-semibold">Quality Score</p>
-                      <p className="text-xs text-muted-foreground mt-1">Based on 8 optimization factors</p>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                      <span className="text-xs text-muted-foreground hidden sm:inline">Quality Score</span>
+                    </div>
+                    <Badge variant="secondary" className="text-[10px] px-2.5 py-0.5 gap-1">
+                      <Check className="h-3 w-3 text-green-500" />
+                      {generationResult.totalChanges || 0} changes applied
+                    </Badge>
+                    <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5">
+                      <Button variant="ghost" size="icon" className={cn('h-7 w-7 rounded-md', viewMode === 'preview' && 'bg-primary text-primary-foreground')} onClick={() => setViewMode('preview')} title="Full Preview">
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className={cn('h-7 w-7 rounded-md', viewMode === 'comparison' && 'bg-primary text-primary-foreground')} onClick={() => setViewMode('comparison')} title="Before/After">
+                        <ArrowLeftRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                {/* Changes Summary */}
-                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }} className="md:col-span-2">
-                  <Card className="border-border/60 h-full">
+              {/* ═══════════ MAIN PREVIEW (Full Width) ═══════════ */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="w-full bg-muted/20">
+                {viewMode === 'preview' && generationResult.htmlCode ? (
+                  <div className="w-full">
+                    {/* Browser chrome bar */}
+                    <div className="flex items-center gap-2 px-4 py-2 bg-muted/60 border-b border-border/40">
+                      <div className="flex gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-400/60" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-400/60" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-400/60" />
+                      </div>
+                      <div className="flex-1 flex items-center justify-center">
+                        <div className="bg-background/90 rounded-md px-3 py-1 text-[10px] text-muted-foreground border border-border/30 w-64 text-center font-mono truncate">
+                          {pageUrl || 'troopod.app/preview'}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            if (!generationResult?.htmlCode) return;
+                            const blob = new Blob([generationResult.htmlCode], { type: 'text/html' });
+                            window.open(URL.createObjectURL(blob), '_blank');
+                          }}
+                          title="Open in new tab"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                    {/* Full-width iframe */}
+                    <iframe
+                      srcDoc={generationResult.htmlCode}
+                      className="w-full border-0 bg-white"
+                      style={{ height: '75vh', minHeight: '500px' }}
+                      title="Generated Landing Page"
+                      sandbox="allow-scripts"
+                    />
+                  </div>
+                ) : viewMode === 'comparison' && generationResult.originalHtml && generationResult.htmlCode ? (
+                  <BeforeAfterComparison
+                    originalHtml={generationResult.originalHtml}
+                    generatedHtml={generationResult.htmlCode}
+                    className="border-0 rounded-none"
+                  />
+                ) : null}
+              </motion.div>
+
+              {/* ═══════════ DETAILS PANEL ═══════════ */}
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                {/* AI Explanation + Source Ad */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                  {/* AI Explanation */}
+                  {generationResult.aiExplanation && (
+                    <div className="lg:col-span-2">
+                      <Card className="border-primary/20 bg-primary/[0.03] h-full">
+                        <CardContent className="p-5">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <Sparkles className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold mb-1">What AI Did</p>
+                              <p className="text-sm text-muted-foreground leading-relaxed">
+                                {generationResult.aiExplanation}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* Source Ad + Score */}
+                  <div className="space-y-4">
+                    {previewUrl && (
+                      <Card className="border-border/60">
+                        <CardContent className="p-4">
+                          <p className="text-xs font-semibold mb-2 flex items-center gap-1.5"><Eye className="h-3.5 w-3.5 text-primary" /> Source Ad</p>
+                          <img src={previewUrl} alt="Source ad creative" className="w-full rounded-lg object-cover border border-border/40" style={{ maxHeight: '120px' }} />
+                        </CardContent>
+                      </Card>
+                    )}
+                    <Card className="score-card-gradient">
+                      <CardContent className="p-4 flex items-center gap-4">
+                        <div className="relative w-16 h-16 flex-shrink-0">
+                          <svg className="w-16 h-16 -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/30" />
+                            <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray="251" strokeDashoffset={251 - (251 * (generationResult.qualityScore || 0)) / 100} strokeLinecap="round" className={cn('score-ring-animated', generationResult.qualityScore && generationResult.qualityScore >= 90 ? 'text-green-500' : generationResult.qualityScore && generationResult.qualityScore >= 70 ? 'text-amber-500' : 'text-red-500')} />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className={cn('text-lg font-bold tabular-nums', getScoreColor(animatedScore))}>
+                              {animatedScore}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">Quality Score</p>
+                          <p className="text-xs text-muted-foreground">{generationResult.totalChanges || 0} optimizations applied</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">{(generationResult.changes || []).filter(c => c.type === 'addition').length} added</span>
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">{(generationResult.changes || []).filter(c => c.type === 'modification').length} modified</span>
+                            <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">{(generationResult.changes || []).filter(c => c.type === 'optimization').length} optimized</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+                {/* Changes List - compact */}
+                {(generationResult.changes && generationResult.changes.length > 0) && (
+                  <Card className="border-border/60 mb-8">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm font-semibold flex items-center gap-2">
                         <Layers className="h-4 w-4 text-primary" />
                         Changes Applied
-                        <Badge variant="secondary" className="text-[10px] ml-auto">
-                          {generationResult.totalChanges || 0} total
-                        </Badge>
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex items-center gap-4 pb-3 mb-3 border-b border-border/40">
-                        <div className="flex items-center gap-1.5 text-xs"><Sparkles className="h-3 w-3 text-green-500" /><span className="text-muted-foreground">{(generationResult.changes || []).filter(c => c.type === 'addition').length} additions</span></div>
-                        <div className="flex items-center gap-1.5 text-xs"><Target className="h-3 w-3 text-amber-500" /><span className="text-muted-foreground">{(generationResult.changes || []).filter(c => c.type === 'modification').length} modifications</span></div>
-                        <div className="flex items-center gap-1.5 text-xs"><Zap className="h-3 w-3 text-blue-500" /><span className="text-muted-foreground">{(generationResult.changes || []).filter(c => c.type === 'optimization').length} optimizations</span></div>
-                      </div>
-                      <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {(generationResult.changes || []).map((change) => (
-                          <div key={change.id} className={cn('flex items-start gap-3 p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors', change.impact === 'high' && 'high-impact-glow')}>
+                          <div key={change.id} className={cn('flex items-start gap-2.5 p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors', change.impact === 'high' && 'high-impact-glow')}>
                             <Badge variant={change.impact === 'high' ? 'default' : change.impact === 'medium' ? 'secondary' : 'outline'} className={cn('text-[10px] mt-0.5 flex-shrink-0', change.impact === 'high' && 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20', change.impact === 'medium' && 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20')}>
                               {change.impact}
                             </Badge>
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-muted-foreground mb-0.5">{change.section}</p>
-                              <p className="text-sm">{change.description}</p>
+                              <p className="text-[11px] font-medium text-muted-foreground">{change.section}</p>
+                              <p className="text-xs">{change.description}</p>
                             </div>
-                            <Badge variant="outline" className="text-[10px] flex-shrink-0">
-                              {change.type}
-                            </Badge>
                           </div>
                         ))}
                       </div>
                     </CardContent>
                   </Card>
-                </motion.div>
-              </div>
+                )}
 
-              {/* AI Explanation */}
-              {generationResult.aiExplanation && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="mb-8">
-                  <Card className="border-primary/20 bg-primary/5">
-                    <CardContent className="p-5">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Sparkles className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold mb-1">AI Explanation</p>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            <span className={typedExplanation.length < (generationResult.aiExplanation?.length || 0) ? 'typing-cursor' : ''}>{typedExplanation}</span>
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )}
-
-              {/* View Mode Toggle */}
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="flex items-center justify-center gap-3 mb-6">
-                <Button
-                  variant={viewMode === 'comparison' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('comparison')}
-                  className="gap-1.5 text-xs"
-                >
-                  <ArrowLeftRight className="h-3.5 w-3.5" />
-                  Before / After
-                </Button>
-                <Button
-                  variant={viewMode === 'preview' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('preview')}
-                  className="gap-1.5 text-xs"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  Full Preview
-                </Button>
+                {/* Action Buttons */}
+                <div className="flex flex-wrap items-center justify-center gap-3 pb-4">
+                  <Button
+                    size="lg"
+                    onClick={handleDownloadCode}
+                    className="gap-2 bg-gradient-to-r from-primary to-violet-500 text-white hover:shadow-lg hover:shadow-primary/20"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download HTML
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="gap-2"
+                    onClick={async () => {
+                      if (!generationResult?.htmlCode) return;
+                      try {
+                        await navigator.clipboard.writeText(generationResult.htmlCode);
+                        toast.success('HTML code copied!');
+                      } catch {
+                        toast.error('Failed to copy');
+                      }
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                    Copy Code
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="gap-2"
+                    onClick={() => {
+                      if (!generationResult?.htmlCode) return;
+                      const blob = new Blob([generationResult.htmlCode], { type: 'text/html' });
+                      window.open(URL.createObjectURL(blob), '_blank');
+                      toast.success('Opened fullscreen!');
+                    }}
+                  >
+                    <Maximize className="h-4 w-4" />
+                    Fullscreen
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="gap-2 border-primary/30 text-primary hover:bg-primary/5"
+                    onClick={() => {
+                      if (!adImageUrl || !pageUrl) return;
+                      toast.info('Regenerating...');
+                      handleGenerate();
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Regenerate
+                  </Button>
+                  <Button variant="ghost" size="lg" onClick={handleReset} className="gap-2 text-muted-foreground">
+                    <RotateCcw className="h-4 w-4" />
+                    Create Another
+                  </Button>
+                </div>
               </motion.div>
-
-              {/* Before/After Comparison OR Full Preview */}
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="mb-8">
-                {viewMode === 'comparison' && generationResult.originalHtml && generationResult.htmlCode ? (
-                  <BeforeAfterComparison
-                    originalHtml={generationResult.originalHtml}
-                    generatedHtml={generationResult.htmlCode}
-                  />
-                ) : generationResult.htmlCode ? (
-                  <PreviewViewer htmlCode={generationResult.htmlCode} />
-                ) : null}
-              </motion.div>
-
-              {/* Action Buttons */}
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="flex flex-wrap items-center justify-center gap-3 pb-8">
-                <Button
-                  size="lg"
-                  onClick={handleDownloadCode}
-                  className="gap-2 bg-gradient-to-r from-primary to-violet-500 text-white hover:shadow-lg hover:shadow-primary/20"
-                >
-                  <Download className="h-4 w-4" />
-                  Download Code
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="gap-2"
-                  onClick={() => {
-                    if (!generationResult?.htmlCode) return;
-                    const blob = new Blob([generationResult.htmlCode], { type: 'text/html' });
-                    const url = URL.createObjectURL(blob);
-                    window.open(url, '_blank');
-                    toast.success('Opened fullscreen preview!');
-                  }}
-                >
-                  <Maximize className="h-4 w-4" />
-                  Fullscreen Preview
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="gap-2"
-                  onClick={async () => {
-                    if (!generationResult?.htmlCode) return;
-                    try {
-                      await navigator.clipboard.writeText(generationResult.htmlCode);
-                      toast.success('HTML code copied to clipboard!');
-                    } catch {
-                      toast.error('Failed to copy');
-                    }
-                  }}
-                >
-                  <Copy className="h-4 w-4" />
-                  Copy Code
-                </Button>
-                <Button variant="outline" size="lg" onClick={handleReset} className="gap-2">
-                  <RotateCcw className="h-4 w-4" />
-                  Create Another
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="gap-2 border-primary/30 text-primary hover:bg-primary/5"
-                  onClick={() => {
-                    if (!adImageUrl || !pageUrl) return;
-                    toast.info('Regenerating with same inputs...');
-                    handleGenerate();
-                  }}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Regenerate
-                </Button>
-              </motion.div>
-
-              {/* Ad Creative Reference */}
-              {previewUrl && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="mb-8">
-                  <Card className="border-border/60">
-                    <CardContent className="p-5">
-                      <div className="flex items-start gap-4">
-                        <img src={previewUrl} alt="Source ad creative" className="w-32 h-24 rounded-lg object-cover border border-border/40 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold mb-1 flex items-center gap-2"><Eye className="h-4 w-4 text-primary" /> Source Ad Creative</p>
-                          <p className="text-xs text-muted-foreground">This landing page was personalized based on the ad creative shown. The AI matched colors, messaging, and visual style to create a cohesive experience.</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )}
             </motion.div>
           )}
         </AnimatePresence>
