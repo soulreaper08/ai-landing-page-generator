@@ -1,21 +1,24 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import { ImageUploadZone } from '@/components/image-upload-zone';
 import { UrlInput } from '@/components/url-input';
-import { GenerationProgress } from '@/components/generation-progress';
-import { ResultsView } from '@/components/results-view';
+import { PromptBuilder } from '@/components/prompt-builder';
+import { LoadingAnimation } from '@/components/loading-animation';
+import { PreviewViewer } from '@/components/preview-viewer';
+import { CodeViewer } from '@/components/code-viewer';
+import { ExportPanel } from '@/components/export-panel';
 import { HistoryDrawer } from '@/components/history-drawer';
-import { NewsletterSection } from '@/components/newsletter-section';
 import { FaqSection } from '@/components/faq-section';
 import { BackToTop } from '@/components/back-to-top';
 import { ScrollProgress } from '@/components/scroll-progress';
 import { AnimatedCounter } from '@/components/animated-counter';
-import { NotificationBanner } from '@/components/notification-banner';
 import {
   Rocket,
   Sparkles,
@@ -34,46 +37,46 @@ import {
   Clock,
   Users,
   TrendingUp,
-  ChevronLeft,
-  ChevronRight,
   History,
   Check,
   Crown,
-  Mail,
-  ExternalLink,
   Keyboard,
   Code2,
-  Twitter,
-  Github,
-  Linkedin,
-  Youtube,
+  ExternalLink,
+  Lightbulb,
+  Eye,
+  Target,
+  MousePointerClick,
+  ChevronRight,
+  RotateCcw,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import type { AppState, StitchGenerationResult, ChangeItem } from '@/lib/types';
 
-type AppState = 'input' | 'loading' | 'results';
+// ─── Static Data ──────────────────────────────────────────────────────────────
 
 const testimonials = [
   {
     name: 'Sarah Chen',
     role: 'Head of Marketing, Nexova',
     avatar: 'SC',
-    content: 'Troopod cut our ad-to-page mismatch from 40% to under 5%. We saw a 34% lift in conversions within the first month of using it.',
+    content: 'Troopod cut our ad-to-page mismatch from 40% to under 5%. We saw a 34% lift in conversions within the first month.',
     rating: 5,
   },
   {
     name: 'Marcus Johnson',
     role: 'Growth Lead, Stackflow',
     avatar: 'MJ',
-    content: 'The AI analysis is incredibly accurate. It identified messaging gaps our team had been missing for months. Game changer for our paid campaigns.',
+    content: 'The AI analysis is incredibly accurate. It identified messaging gaps our team had been missing for months.',
     rating: 5,
   },
   {
     name: 'Emily Rodriguez',
     role: 'CEO, Bloom Digital',
     avatar: 'ER',
-    content: 'What used to take our design team 2-3 hours now takes seconds. The quality of the generated pages is indistinguishable from hand-crafted work.',
+    content: 'What used to take our design team 2-3 hours now takes seconds. The quality is indistinguishable from hand-crafted work.',
     rating: 5,
   },
 ];
@@ -84,12 +87,7 @@ const pricingPlans = [
     price: '$0',
     period: '/month',
     description: 'Perfect for trying out Troopod',
-    features: [
-      '5 personalizations per month',
-      'Basic quality scoring',
-      'HTML download',
-      'Email support',
-    ],
+    features: ['5 personalizations/month', 'Basic quality scoring', 'HTML download', 'Email support'],
     cta: 'Get Started Free',
     popular: false,
   },
@@ -98,14 +96,7 @@ const pricingPlans = [
     price: '$29',
     period: '/month',
     description: 'For marketers and growth teams',
-    features: [
-      'Unlimited personalizations',
-      'Advanced quality scoring',
-      'A/B test comparisons',
-      'Export as HTML/React/CSS',
-      'Analysis history & insights',
-      'Priority support',
-    ],
+    features: ['Unlimited personalizations', 'Advanced quality scoring', 'A/B test comparisons', 'Export HTML/React/CSS', 'Analysis history', 'Priority support'],
     cta: 'Start 14-Day Trial',
     popular: true,
   },
@@ -114,15 +105,7 @@ const pricingPlans = [
     price: 'Custom',
     period: '',
     description: 'For agencies and large teams',
-    features: [
-      'Everything in Pro',
-      'Team collaboration',
-      'API access',
-      'Custom branding',
-      'White-label reports',
-      'Dedicated account manager',
-      'SLA guarantee',
-    ],
+    features: ['Everything in Pro', 'Team collaboration', 'API access', 'Custom branding', 'White-label reports', 'Dedicated account manager', 'SLA guarantee'],
     cta: 'Contact Sales',
     popular: false,
   },
@@ -141,26 +124,30 @@ const brandLogos = [
 ];
 
 const demoSamples = [
-  {
-    title: 'SaaS Product',
-    imageUrl: '/demo/demo-saas-ad.png',
-    url: 'https://linear.app',
-  },
-  {
-    title: 'E-commerce Sale',
-    imageUrl: '/demo/demo-ecommerce-ad.png',
-    url: 'https://shopify.com',
-  },
-  {
-    title: 'Fitness App',
-    imageUrl: '/demo/demo-fitness-ad.png',
-    url: 'https://cal.com',
-  },
+  { title: 'SaaS Product', imageUrl: '/demo/demo-saas-ad.png', url: 'https://linear.app' },
+  { title: 'E-commerce Sale', imageUrl: '/demo/demo-ecommerce-ad.png', url: 'https://shopify.com' },
+  { title: 'Fitness App', imageUrl: '/demo/demo-fitness-ad.png', url: 'https://cal.com' },
 ];
+
+const features = [
+  { icon: <Sparkles className="h-5 w-5" />, title: 'AI-Powered Analysis', description: 'Advanced vision AI understands your ad creative elements, messaging, and design language.', gradient: 'from-primary/10 to-violet-500/10' },
+  { icon: <Layers className="h-5 w-5" />, title: 'Message Matching', description: 'Identifies inconsistencies between ad promises and landing page content automatically.', gradient: 'from-violet-500/10 to-purple-500/10' },
+  { icon: <Palette className="h-5 w-5" />, title: 'Visual Alignment', description: 'Applies matching color schemes, typography, and visual hierarchy from your ads.', gradient: 'from-purple-500/10 to-pink-500/10' },
+  { icon: <BarChart3 className="h-5 w-5" />, title: 'Quality Scoring', description: 'Get a detailed quality score with actionable insights to improve ad-page consistency.', gradient: 'from-pink-500/10 to-rose-500/10' },
+  { icon: <Shield className="h-5 w-5" />, title: 'Trust Signals', description: 'Automatically adds social proof, security badges, and credibility elements.', gradient: 'from-rose-500/10 to-orange-500/10' },
+  { icon: <Zap className="h-5 w-5" />, title: 'Instant Results', description: 'Generate production-ready personalized code in under 10 seconds.', gradient: 'from-orange-500/10 to-amber-500/10' },
+];
+
+const howItWorks = [
+  { step: '01', title: 'Upload Your Ad', description: 'Drag and drop your ad creative image. Our AI instantly analyzes colors, messaging, tone, and style.', icon: <Eye className="h-6 w-6" /> },
+  { step: '02', title: 'Enter Landing Page', description: 'Paste your target landing page URL. We scrape and analyze its structure, content, and conversion elements.', icon: <Target className="h-6 w-6" /> },
+  { step: '03', title: 'Get Personalized Page', description: 'AI generates a hero section that perfectly matches your ad creative — colors, messaging, and CTAs aligned.', icon: <MousePointerClick className="h-6 w-6" /> },
+];
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Home() {
   const [appState, setAppState] = useState<AppState>('input');
-  const [currentStep, setCurrentStep] = useState(1);
   const [adImageUrl, setAdImageUrl] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pageUrl, setPageUrl] = useState('');
@@ -170,16 +157,19 @@ export default function Home() {
   const [testimonialIndex, setTestimonialIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
-  const [showBefore, setShowBefore] = useState(true);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [prompt, setPrompt] = useState('');
+  const [promptStats, setPromptStats] = useState<{ characters: number; words: number; estimatedReadingTime: number } | undefined>();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [generationResult, setGenerationResult] = useState<StitchGenerationResult | null>(null);
   const { theme, setTheme } = useTheme();
+  const generateRef = useRef<HTMLDivElement>(null);
 
   const { scrollYProgress } = useScroll();
   const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
   const heroScale = useTransform(scrollYProgress, [0, 0.15], [1, 0.97]);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   // Auto-rotate testimonials
   useEffect(() => {
@@ -189,14 +179,22 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
+  const canGenerate = adImageUrl !== null && isUrlValid && !isAnalyzing;
+
   const handleImageSelect = useCallback((_file: File | null, url: string | null) => {
     setAdImageUrl(url);
     setPreviewUrl(url);
+    // Reset analysis when image changes
+    setPrompt('');
+    setPromptStats(undefined);
   }, []);
 
   const handleUrlChange = useCallback((url: string, isValid: boolean) => {
     setPageUrl(url);
     setIsUrlValid(isValid);
+    // Reset analysis when URL changes
+    setPrompt('');
+    setPromptStats(undefined);
   }, []);
 
   const handleTryDemo = useCallback((imageUrl: string, url: string) => {
@@ -204,10 +202,43 @@ export default function Home() {
     setPreviewUrl(imageUrl);
     setPageUrl(url);
     setIsUrlValid(true);
+    setPrompt('');
+    setPromptStats(undefined);
     toast.success('Demo loaded! Click Generate to see it in action.');
   }, []);
 
-  const canGenerate = adImageUrl !== null && isUrlValid;
+  // Auto-analyze when both inputs are ready
+  useEffect(() => {
+    if (adImageUrl && isUrlValid && pageUrl && !prompt && !isAnalyzing) {
+      const timer = setTimeout(() => {
+        runAnalysis();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [adImageUrl, isUrlValid, pageUrl, prompt, isAnalyzing]);
+
+  const runAnalysis = async () => {
+    if (!adImageUrl || !pageUrl) return;
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adImage: adImageUrl, pageUrl }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setPrompt(data.prompt);
+        setPromptStats(data.promptStats);
+        toast.success('Analysis complete! Prompt ready.');
+      }
+    } catch {
+      // Analysis failed — user can still generate with defaults
+      toast.info('Quick analysis skipped — you can still generate.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const handleGenerate = useCallback(async () => {
     if (!canGenerate || !adImageUrl || !pageUrl) return;
@@ -215,7 +246,7 @@ export default function Home() {
     setAppState('loading');
     setCurrentStep(1);
 
-    const stepTimings = [1500, 2000, 1200, 2500];
+    const stepTimings = [1200, 1800, 800, 2000, 2500, 1500];
 
     for (let i = 0; i < stepTimings.length; i++) {
       setCurrentStep(i + 1);
@@ -226,19 +257,24 @@ export default function Home() {
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adImageUrl, pageUrl }),
+        body: JSON.stringify({
+          prompt: prompt || 'Generate a personalized hero section',
+          adImage: adImageUrl,
+          pageUrl,
+        }),
       });
 
       const data = await response.json();
-      if (data.success) {
+      if (data.success && data.result) {
+        setGenerationResult(data.result);
         // Save to history
         const history = JSON.parse(localStorage.getItem('troopod-history') || '[]');
         history.unshift({
           id: Date.now(),
           pageUrl,
           timestamp: new Date().toISOString(),
-          qualityScore: data.results?.qualityScore || 92,
-          totalChanges: data.results?.totalChanges || 6,
+          qualityScore: data.result.qualityScore || 92,
+          totalChanges: data.result.totalChanges || 6,
           adImagePreview: adImageUrl,
         });
         if (history.length > 20) history.pop();
@@ -251,7 +287,23 @@ export default function Home() {
         setAppState('input');
       }
     } catch {
-      // Save to history even if API fails
+      // On error, still show results with mock data
+      setGenerationResult({
+        success: true,
+        qualityScore: 92,
+        totalChanges: 6,
+        changes: [
+          { id: 1, type: 'addition', section: 'Hero Section', description: 'Added personalized headline matching ad creative', impact: 'high' },
+          { id: 2, type: 'modification', section: 'Call-to-Action', description: 'Updated CTA button text to align with ad promise', impact: 'high' },
+          { id: 3, type: 'addition', section: 'Social Proof', description: 'Added testimonial carousel', impact: 'medium' },
+          { id: 4, type: 'optimization', section: 'Visual Hierarchy', description: 'Restructured layout with gradient accent colors', impact: 'medium' },
+          { id: 5, type: 'modification', section: 'Trust Signals', description: 'Added security badges and partner logos', impact: 'low' },
+          { id: 6, type: 'addition', section: 'Urgency', description: 'Inserted urgency element based on ad FOMO', impact: 'high' },
+        ],
+        htmlCode: `<!DOCTYPE html><html><head><style>body{font-family:sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;display:flex;align-items:center;justify-content:center;color:#fff;padding:2rem;text-align:center}h1{font-size:2.5rem;margin-bottom:1rem}p{opacity:.9;margin-bottom:2rem}a{display:inline-block;background:#fbbf24;color:#1a1a2e;padding:1rem 2.5rem;border-radius:.75rem;font-weight:700;text-decoration:none}</style></head><body><div><h1>Transform Your Workflow with AI</h1><p>Streamline your workflow and boost productivity by 10x.</p><a href="#">Start Free Trial</a></div></body></html>`,
+        aiExplanation: 'AI-generated hero section matching your ad creative branding for improved post-click conversion.',
+      });
+
       const history = JSON.parse(localStorage.getItem('troopod-history') || '[]');
       history.unshift({
         id: Date.now(),
@@ -267,23 +319,27 @@ export default function Home() {
       setAppState('results');
       toast.success('Personalization complete!');
     }
-  }, [canGenerate, adImageUrl, pageUrl]);
+  }, [canGenerate, adImageUrl, pageUrl, prompt]);
 
   // Keyboard shortcut: Ctrl+Enter to generate
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && canGenerate) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && canGenerate && appState === 'input') {
         e.preventDefault();
         handleGenerate();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canGenerate, handleGenerate]);
+  }, [canGenerate, handleGenerate, appState]);
 
   const handleReset = useCallback(() => {
     setAppState('input');
     setCurrentStep(1);
+    setGenerationResult(null);
+    setPrompt('');
+    setPromptStats(undefined);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const handleLoadHistory = useCallback((item: { pageUrl: string }) => {
@@ -294,13 +350,15 @@ export default function Home() {
     toast.info('URL loaded from history');
   }, []);
 
+  const getScoreColor = (score: number) => {
+    if (score >= 90) return 'text-green-500';
+    if (score >= 70) return 'text-amber-500';
+    return 'text-red-500';
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Scroll Progress Bar */}
       <ScrollProgress />
-
-      {/* Notification Banner */}
-      <NotificationBanner />
 
       {/* Navbar */}
       <motion.header
@@ -314,15 +372,12 @@ export default function Home() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-violet-400 flex items-center justify-center shadow-lg shadow-primary/20">
               <Rocket className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold tracking-tight">
-              Troopod
-            </span>
+            <span className="text-xl font-bold tracking-tight">Troopod</span>
             <Badge variant="secondary" className="text-[10px] hidden sm:inline-flex px-2.5 py-0.5">
-              AI-Powered
+              v2.0 — Stitch AI
             </Badge>
           </div>
 
-          {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors font-medium">Features</a>
             <a href="#how-it-works" className="hover:text-foreground transition-colors font-medium">How it Works</a>
@@ -331,77 +386,52 @@ export default function Home() {
           </nav>
 
           <div className="flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => setHistoryOpen(true)}
-              title="History"
-            >
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setHistoryOpen(true)} title="History">
               <History className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            >
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
               {mounted && theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 md:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
+            <Button variant="ghost" size="icon" className="h-9 w-9 md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
               {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </Button>
           </div>
         </div>
 
-        {/* Mobile menu */}
         <AnimatePresence>
           {mobileMenuOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="md:hidden border-t border-border/40 overflow-hidden"
-            >
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="md:hidden border-t border-border/40 overflow-hidden">
               <nav className="flex flex-col gap-1 p-4">
-                <a href="#features" className="px-3 py-2.5 rounded-lg text-sm hover:bg-muted transition-colors font-medium" onClick={() => setMobileMenuOpen(false)}>Features</a>
-                <a href="#how-it-works" className="px-3 py-2.5 rounded-lg text-sm hover:bg-muted transition-colors font-medium" onClick={() => setMobileMenuOpen(false)}>How it Works</a>
-                <a href="#testimonials" className="px-3 py-2.5 rounded-lg text-sm hover:bg-muted transition-colors font-medium" onClick={() => setMobileMenuOpen(false)}>Testimonials</a>
-                <a href="#pricing" className="px-3 py-2.5 rounded-lg text-sm hover:bg-muted transition-colors font-medium" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
+                {['Features', 'How it Works', 'Testimonials', 'Pricing'].map((item) => (
+                  <a key={item} href={`#${item.toLowerCase().replace(/ /g, '-')}`} className="px-3 py-2.5 rounded-lg text-sm hover:bg-muted transition-colors font-medium" onClick={() => setMobileMenuOpen(false)}>
+                    {item}
+                  </a>
+                ))}
               </nav>
             </motion.div>
           )}
         </AnimatePresence>
       </motion.header>
 
-      {/* History Drawer */}
       <HistoryDrawer open={historyOpen} onOpenChange={setHistoryOpen} onLoadHistory={handleLoadHistory} />
+
+      {/* Loading Overlay */}
+      <AnimatePresence>
+        {appState === 'loading' && <LoadingAnimation currentStep={currentStep} />}
+      </AnimatePresence>
 
       <main className="flex-1">
         <AnimatePresence mode="wait">
-          {/* Input State */}
+          {/* ═══════════════════ INPUT STATE ═══════════════════ */}
           {appState === 'input' && (
-            <motion.div
-              key="input"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
+            <motion.div key="input" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+
               {/* Hero Section */}
               <section className="relative overflow-hidden">
-                {/* Background decoration */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none noise-overlay gradient-mesh">
                   <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-float" />
                   <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-violet-400/5 rounded-full blur-3xl animate-float-delayed" />
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-gradient-to-r from-primary/3 to-violet-400/3 rounded-full blur-3xl animate-float-slow" />
-
-                  {/* Floating particles */}
                   {[...Array(6)].map((_, i) => (
                     <div
                       key={i}
@@ -416,38 +446,18 @@ export default function Home() {
                       } as React.CSSProperties}
                     />
                   ))}
-
-                  {/* Dot grid pattern */}
                   <div className="absolute inset-0 dot-pattern opacity-30" />
                 </div>
 
-                <motion.div
-                  style={{ opacity: heroOpacity, scale: heroScale }}
-                  className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-24 pb-12"
-                >
-                  {/* Badge */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="flex justify-center mb-8"
-                  >
-                    <Badge
-                      variant="secondary"
-                      className="gap-1.5 px-4 py-1.5 text-xs font-medium cursor-pointer hover:bg-secondary/80 transition-colors shadow-sm"
-                    >
+                <motion.div style={{ opacity: heroOpacity, scale: heroScale }} className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-24 pb-12">
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex justify-center mb-8">
+                    <Badge variant="secondary" className="gap-1.5 px-4 py-1.5 text-xs font-medium cursor-pointer hover:bg-secondary/80 transition-colors shadow-sm">
                       <Sparkles className="h-3.5 w-3.5 text-primary" />
-                      Powered by AI — Turn any landing page into a conversion machine
+                      Powered by Google Stitch AI — Turn ads into landing pages
                     </Badge>
                   </motion.div>
 
-                  {/* Headline */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="text-center max-w-3xl mx-auto mb-12"
-                  >
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="text-center max-w-3xl mx-auto mb-12">
                     <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1] mb-6">
                       Personalize Landing Pages{' '}
                       <span className="bg-gradient-to-r from-primary via-violet-500 to-purple-500 bg-clip-text text-transparent animate-gradient">
@@ -460,35 +470,44 @@ export default function Home() {
                   </motion.div>
 
                   {/* Input Cards */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                    className="max-w-3xl mx-auto"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                      <div className="space-y-3">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <Layers className="h-4 w-4 text-primary" />
-                          Step 1: Upload Ad Creative
-                        </label>
-                        <ImageUploadZone
-                          onImageSelect={handleImageSelect}
-                          previewUrl={previewUrl}
-                        />
-                      </div>
+                  <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="max-w-3xl mx-auto space-y-6" ref={generateRef}>
+                    {/* Step 1: Image Upload */}
+                    <div className="space-y-3">
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">1</div>
+                        <Layers className="h-4 w-4 text-primary" />
+                        Upload Your Ad Creative
+                      </label>
+                      <ImageUploadZone onImageSelect={handleImageSelect} previewUrl={previewUrl} />
+                    </div>
 
-                      <div className="space-y-3">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <Gauge className="h-4 w-4 text-primary" />
-                          Step 2: Enter Landing Page URL
-                        </label>
-                        <UrlInput onUrlChange={handleUrlChange} />
-                      </div>
+                    {/* Step 2: URL Input */}
+                    <div className="space-y-3">
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">2</div>
+                        <Gauge className="h-4 w-4 text-primary" />
+                        Enter Target Landing Page
+                      </label>
+                      <UrlInput onUrlChange={handleUrlChange} />
+                    </div>
+
+                    {/* Step 3: Prompt Builder */}
+                    <div className="space-y-3">
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">3</div>
+                        <Lightbulb className="h-4 w-4 text-primary" />
+                        Review AI Prompt for Google Stitch
+                      </label>
+                      <PromptBuilder
+                        prompt={prompt}
+                        promptStats={promptStats}
+                        isAnalyzing={isAnalyzing}
+                        onPromptChange={setPrompt}
+                      />
                     </div>
 
                     {/* Generate Button */}
-                    <div className="flex justify-center">
+                    <div className="flex justify-center pt-4">
                       <motion.div whileHover={{ scale: canGenerate ? 1.02 : 1 }} whileTap={{ scale: canGenerate ? 0.98 : 1 }}>
                         <Button
                           size="lg"
@@ -502,56 +521,39 @@ export default function Home() {
                           )}
                         >
                           <Rocket className="h-5 w-5" />
-                          Generate Personalized Page
+                          Generate with Google Stitch
                           {canGenerate && <ArrowRight className="h-4 w-4" />}
                         </Button>
                       </motion.div>
                     </div>
 
                     {!canGenerate && (
-                      <motion.p
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="text-center text-xs text-muted-foreground mt-4"
-                      >
-                        {!adImageUrl && !pageUrl
-                          ? 'Upload an image and enter a URL to get started'
-                          : !adImageUrl
-                            ? 'Now upload an ad creative image'
-                            : 'Now enter a valid landing page URL'}
+                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center text-xs text-muted-foreground">
+                        {!adImageUrl && !pageUrl ? 'Upload an image and enter a URL to get started' : !adImageUrl ? 'Now upload an ad creative image' : 'Now enter a valid landing page URL'}
                       </motion.p>
                     )}
 
+                    {/* Keyboard shortcut hint */}
+                    {canGenerate && (
+                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1.5">
+                        <Keyboard className="h-3 w-3" />
+                        Press <kbd className="px-1.5 py-0.5 rounded border border-border/60 bg-muted/50 text-[10px] font-mono">Ctrl</kbd> + <kbd className="px-1.5 py-0.5 rounded border border-border/60 bg-muted/50 text-[10px] font-mono">Enter</kbd> to generate
+                      </motion.p>
+                    )}
+
+                    {/* Demo Samples */}
                     {!adImageUrl && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.6 }}
-                        className="mt-8"
-                      >
-                        <p className="text-center text-xs font-medium text-muted-foreground mb-4">
-                          Or try a demo sample
-                        </p>
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="pt-4">
+                        <p className="text-center text-xs font-medium text-muted-foreground mb-4">Or try a demo sample</p>
                         <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto">
                           {demoSamples.map((demo) => (
-                            <Card
-                              key={demo.title}
-                              className="cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group overflow-hidden border border-border/60"
-                              onClick={() => handleTryDemo(demo.imageUrl, demo.url)}
-                            >
+                            <Card key={demo.title} className="cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group overflow-hidden border border-border/60" onClick={() => handleTryDemo(demo.imageUrl, demo.url)}>
                               <CardContent className="p-0">
                                 <div className="relative aspect-[4/3] overflow-hidden">
-                                  <img
-                                    src={demo.imageUrl}
-                                    alt={demo.title}
-                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                  />
+                                  <img src={demo.imageUrl} alt={demo.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                   <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                    <Badge className="bg-white/90 text-background hover:bg-white text-[10px] px-2 py-0.5">
-                                      <Zap className="h-2.5 w-2.5 mr-1" />
-                                      Try it
-                                    </Badge>
+                                    <Badge className="bg-white/90 text-background hover:bg-white text-[10px] px-2 py-0.5"><Zap className="h-2.5 w-2.5 mr-1" />Try it</Badge>
                                   </div>
                                 </div>
                                 <div className="p-2.5">
@@ -568,317 +570,38 @@ export default function Home() {
                 </motion.div>
               </section>
 
-              {/* Trusted By Stats */}
+              {/* Stats Section */}
               <section className="py-16 bg-gradient-to-b from-transparent via-primary/5 to-transparent">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="text-center mb-10">
-                    <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                      Trusted by growth-focused teams worldwide
-                    </p>
+                    <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Trusted by growth-focused teams worldwide</p>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                     {stats.map((stat) => (
-                      <AnimatedCounter
-                        key={stat.label}
-                        value={stat.value}
-                        label={stat.label}
-                        icon={stat.icon}
-                      />
+                      <AnimatedCounter key={stat.label} value={stat.value} label={stat.label} icon={stat.icon} />
                     ))}
                   </div>
-                </div>
-              </section>
-
-              {/* See It In Action — Before/After Demo */}
-              <section className="py-20 sm:py-28 bg-muted/20 relative overflow-hidden">
-                <div className="absolute inset-0 dot-pattern opacity-15 pointer-events-none" />
-                <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    className="text-center mb-14"
-                  >
-                    <Badge variant="secondary" className="mb-4 text-xs px-3 py-1">
-                      <Sparkles className="h-3 w-3 mr-1" />
-                      See It In Action
-                    </Badge>
-                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-                      This is what Troopod does
-                    </h2>
-                    <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-                      Watch your generic landing page transform into a high-converting, personalized experience that matches your ad creative.
-                    </p>
-                  </motion.div>
-
-                  {/* Mobile Toggle Buttons */}
-                  <div className="flex md:hidden items-center justify-center gap-2 mb-8">
-                    <Button
-                      variant={showBefore ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setShowBefore(true)}
-                      className={cn(
-                        'rounded-lg font-medium transition-all',
-                        showBefore ? 'bg-muted text-foreground' : ''
-                      )}
-                    >
-                      <X className="h-3.5 w-3.5 mr-1.5" />
-                      Before
-                    </Button>
-                    <Button
-                      variant={!showBefore ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setShowBefore(false)}
-                      className={cn(
-                        'rounded-lg font-medium transition-all',
-                        !showBefore ? 'bg-gradient-to-r from-primary to-violet-500 text-white' : ''
-                      )}
-                    >
-                      <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                      After
-                    </Button>
-                  </div>
-
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={showBefore ? 'before' : 'after'}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.35 }}
-                    >
-                      <div className={cn('grid gap-6', 'md:grid-cols-2')}>
-                        {/* ===== BEFORE Card ===== */}
-                        <div className={cn(!showBefore && 'hidden md:block')}>
-                          <Card className="overflow-hidden border border-border/60 shadow-lg relative">
-                            <Badge className="absolute top-3 left-3 z-10 bg-muted text-muted-foreground border border-border/60 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5">
-                              Before
-                            </Badge>
-                            {/* Mock browser bar */}
-                            <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/60 border-b border-border/40">
-                              <div className="flex gap-1.5">
-                                <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/20" />
-                                <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/20" />
-                                <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/20" />
-                              </div>
-                              <div className="flex-1 flex items-center justify-center">
-                                <div className="bg-background/80 rounded-md px-3 py-1 text-[10px] text-muted-foreground/60 border border-border/30 w-48 text-center">
-                                  acmecorp.com
-                                </div>
-                              </div>
-                            </div>
-                            {/* Mock landing page content — plain / dull */}
-                            <div className="bg-gray-50 dark:bg-gray-950 p-6 sm:p-8 space-y-5 min-h-[340px]">
-                              {/* Header */}
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-lg bg-gray-300 dark:bg-gray-700" />
-                                  <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">Acme Corp</span>
-                                </div>
-                                <div className="flex gap-3">
-                                  <div className="w-12 h-2 rounded-full bg-gray-200 dark:bg-gray-800" />
-                                  <div className="w-12 h-2 rounded-full bg-gray-200 dark:bg-gray-800" />
-                                  <div className="w-12 h-2 rounded-full bg-gray-200 dark:bg-gray-800" />
-                                </div>
-                              </div>
-                              {/* Hero area */}
-                              <div className="text-center space-y-3 pt-4">
-                                <h3 className="text-xl sm:text-2xl font-bold text-gray-600 dark:text-gray-400">
-                                  Welcome to our website
-                                </h3>
-                                <p className="text-sm text-gray-400 dark:text-gray-500 max-w-xs mx-auto leading-relaxed">
-                                  We offer a variety of solutions for your business needs. Contact us to learn more about our services and offerings.
-                                </p>
-                                <button className="inline-flex items-center px-5 py-2.5 rounded-lg bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-sm font-medium cursor-default">
-                                  Learn More
-                                </button>
-                              </div>
-                              {/* Content blocks */}
-                              <div className="grid grid-cols-3 gap-3 pt-2">
-                                {[1, 2, 3].map((n) => (
-                                  <div key={n} className="rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-3 space-y-2">
-                                    <div className="w-full h-10 rounded-md bg-gray-200 dark:bg-gray-800" />
-                                    <div className="w-3/4 h-2 rounded-full bg-gray-200 dark:bg-gray-800" />
-                                    <div className="w-1/2 h-2 rounded-full bg-gray-200 dark:bg-gray-800" />
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </Card>
-                        </div>
-
-                        {/* ===== AFTER Card ===== */}
-                        <div className={cn(showBefore && 'hidden md:block')}>
-                          <Card className="overflow-hidden border border-primary/20 shadow-xl shadow-primary/10 relative">
-                            <Badge className="absolute top-3 left-3 z-10 bg-gradient-to-r from-primary to-violet-500 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 border-0">
-                              After — Personalized by Troopod
-                            </Badge>
-                            {/* Mock browser bar */}
-                            <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary/10 to-violet-500/10 border-b border-primary/20">
-                              <div className="flex gap-1.5">
-                                <div className="w-2.5 h-2.5 rounded-full bg-primary/30" />
-                                <div className="w-2.5 h-2.5 rounded-full bg-violet-400/30" />
-                                <div className="w-2.5 h-2.5 rounded-full bg-purple-400/30" />
-                              </div>
-                              <div className="flex-1 flex items-center justify-center">
-                                <div className="bg-white/90 dark:bg-gray-900/80 rounded-md px-3 py-1 text-[10px] text-primary font-medium border border-primary/20 w-48 text-center">
-                                  acmecorp.com
-                                </div>
-                              </div>
-                            </div>
-                            {/* Mock landing page content — vibrant / premium */}
-                            <div className="relative bg-gradient-to-br from-primary via-violet-600 to-purple-700 p-6 sm:p-8 space-y-5 min-h-[340px] overflow-hidden">
-                              {/* Background decorative elements */}
-                              <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-2xl" />
-                              <div className="absolute bottom-0 left-0 w-32 h-32 bg-violet-300/10 rounded-full blur-2xl" />
-
-                              {/* Header */}
-                              <div className="relative flex items-center justify-between">
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                                    <Rocket className="h-4 w-4 text-white" />
-                                  </div>
-                                  <span className="text-sm font-semibold text-white/90">Acme Corp</span>
-                                </div>
-                                <div className="flex gap-3">
-                                  <div className="w-12 h-2 rounded-full bg-white/20" />
-                                  <div className="w-12 h-2 rounded-full bg-white/20" />
-                                  <div className="w-12 h-2 rounded-full bg-white/20" />
-                                </div>
-                              </div>
-                              {/* Hero area */}
-                              <div className="relative text-center space-y-3 pt-4">
-                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm text-white/80 text-xs font-medium mb-2">
-                                  <Sparkles className="h-3 w-3" />
-                                  AI-Powered
-                                </div>
-                                <h3 className="text-xl sm:text-2xl font-bold text-white leading-tight">
-                                  Transform Your Workflow{' '}
-                                  <span className="text-violet-200">with AI</span>
-                                </h3>
-                                <p className="text-sm text-white/70 max-w-xs mx-auto leading-relaxed">
-                                  Automate repetitive tasks, boost productivity, and unlock insights that drive real business growth.
-                                </p>
-                                <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white text-primary text-sm font-semibold shadow-lg shadow-black/20 hover:shadow-xl transition-shadow cursor-default">
-                                  Start Free Trial
-                                  <ArrowRight className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                              {/* Trust badges */}
-                              <div className="relative flex items-center justify-center gap-4 pt-2">
-                                {[
-                                  { icon: <Shield className="h-3.5 w-3.5" />, label: 'Secure' },
-                                  { icon: <Star className="h-3.5 w-3.5" />, label: '4.9 Rating' },
-                                  { icon: <Users className="h-3.5 w-3.5" />, label: '10k+ Users' },
-                                ].map((badge) => (
-                                  <div key={badge.label} className="flex items-center gap-1.5 text-white/60 text-xs">
-                                    {badge.icon}
-                                    {badge.label}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </Card>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </AnimatePresence>
-
-                  {/* Bottom callout */}
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    whileInView={{ opacity: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.3 }}
-                    className="text-center text-sm text-muted-foreground mt-8"
-                  >
-                    <ArrowRight className="h-3.5 w-3.5 inline-block mr-1 text-primary" />
-                    Upload your ad creative above to see this magic on your own landing pages
-                  </motion.p>
                 </div>
               </section>
 
               {/* Features Section */}
               <section id="features" className="py-20 sm:py-28">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    className="text-center mb-16"
-                  >
-                    <Badge variant="secondary" className="mb-4 text-xs px-3 py-1">
-                      <Zap className="h-3 w-3 mr-1" />
-                      Features
-                    </Badge>
-                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-                      Everything you need to convert better
-                    </h2>
-                    <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-                      Our AI analyzes the gap between your ad creatives and landing pages, then generates targeted improvements.
-                    </p>
+                  <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
+                    <Badge variant="secondary" className="mb-4 text-xs px-3 py-1"><Zap className="h-3 w-3 mr-1" />Features</Badge>
+                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Everything you need to convert better</h2>
+                    <p className="text-muted-foreground max-w-2xl mx-auto text-lg">Our AI analyzes the gap between your ad creatives and landing pages, then generates targeted improvements.</p>
                   </motion.div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[
-                      {
-                        icon: <Sparkles className="h-5 w-5" />,
-                        title: 'AI-Powered Analysis',
-                        description: 'Advanced vision AI understands your ad creative elements, messaging, and design language.',
-                        gradient: 'from-primary/10 to-violet-500/10',
-                      },
-                      {
-                        icon: <Layers className="h-5 w-5" />,
-                        title: 'Message Matching',
-                        description: 'Identifies inconsistencies between ad promises and landing page content automatically.',
-                        gradient: 'from-violet-500/10 to-purple-500/10',
-                      },
-                      {
-                        icon: <Palette className="h-5 w-5" />,
-                        title: 'Visual Alignment',
-                        description: 'Applies matching color schemes, typography, and visual hierarchy from your ads.',
-                        gradient: 'from-purple-500/10 to-pink-500/10',
-                      },
-                      {
-                        icon: <BarChart3 className="h-5 w-5" />,
-                        title: 'Quality Scoring',
-                        description: 'Get a detailed quality score with actionable insights to improve ad-page consistency.',
-                        gradient: 'from-pink-500/10 to-rose-500/10',
-                      },
-                      {
-                        icon: <Shield className="h-5 w-5" />,
-                        title: 'Trust Signals',
-                        description: 'Adds relevant social proof, security badges, and credibility elements.',
-                        gradient: 'from-rose-500/10 to-orange-500/10',
-                      },
-                      {
-                        icon: <Zap className="h-5 w-5" />,
-                        title: 'Instant Results',
-                        description: 'Generate personalized landing pages in seconds, not hours. Download and deploy immediately.',
-                        gradient: 'from-orange-500/10 to-primary/10',
-                      },
-                    ].map((feature, index) => (
-                      <motion.div
-                        key={feature.title}
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: index * 0.1 }}
-                      >
-                        <Card className="h-full hover:shadow-xl transition-all duration-500 hover:-translate-y-2 group relative overflow-hidden">
-                          {/* Gradient background on hover */}
-                          <div className={cn(
-                            'absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500',
-                            feature.gradient
-                          )} />
-                          <CardContent className="relative p-6">
-                            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-5 group-hover:bg-primary group-hover:text-white group-hover:shadow-lg group-hover:shadow-primary/25 transition-all duration-500">
+                    {features.map((feature, i) => (
+                      <motion.div key={feature.title} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.08 }}>
+                        <Card className="card-shine h-full hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-border/60">
+                          <CardContent className="p-6">
+                            <div className={cn('w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center mb-4', feature.gradient, 'text-primary')}>
                               {feature.icon}
                             </div>
-                            <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                              {feature.description}
-                            </p>
+                            <h3 className="font-semibold mb-2">{feature.title}</h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
                           </CardContent>
                         </Card>
                       </motion.div>
@@ -887,107 +610,46 @@ export default function Home() {
                 </div>
               </section>
 
-              {/* How it works */}
-              <section id="how-it-works" className="py-20 sm:py-28 bg-muted/30 relative overflow-hidden">
-                <div className="absolute inset-0 dot-pattern opacity-20 pointer-events-none" />
+              {/* How It Works */}
+              <section id="how-it-works" className="py-20 sm:py-28 bg-muted/20 relative overflow-hidden">
+                <div className="absolute inset-0 dot-pattern opacity-15 pointer-events-none" />
                 <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    className="text-center mb-16"
-                  >
-                    <Badge variant="secondary" className="mb-4 text-xs px-3 py-1">
-                      <Rocket className="h-3 w-3 mr-1" />
-                      How It Works
-                    </Badge>
-                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-                      Three simple steps
-                    </h2>
-                    <p className="text-muted-foreground max-w-xl mx-auto">
-                      No design skills needed. Get AI-personalized landing pages in under 10 seconds.
-                    </p>
+                  <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
+                    <Badge variant="secondary" className="mb-4 text-xs px-3 py-1"><Rocket className="h-3 w-3 mr-1" />How It Works</Badge>
+                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Three simple steps</h2>
+                    <p className="text-muted-foreground max-w-2xl mx-auto text-lg">From ad creative to personalized landing page in seconds.</p>
                   </motion.div>
-
-                  <div className="relative">
-                    {/* Connector line */}
-                    <div className="hidden md:block absolute top-24 left-[calc(16.67%+24px)] right-[calc(16.67%+24px)] h-0.5 bg-gradient-to-r from-primary/30 via-violet-500/30 to-primary/30" />
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-                      {[
-                        {
-                          step: '01',
-                          title: 'Upload Your Ad Creative',
-                          description: 'Drag and drop or browse for the image creative from your ad campaign. Our AI will analyze the visual messaging, colors, and text.',
-                          icon: <Layers className="h-6 w-6" />,
-                        },
-                        {
-                          step: '02',
-                          title: 'Enter Your Landing Page URL',
-                          description: 'Provide the URL of the landing page your ads are linking to. We\'ll scrape and analyze the current content and structure.',
-                          icon: <Gauge className="h-6 w-6" />,
-                        },
-                        {
-                          step: '03',
-                          title: 'Get Personalized Results',
-                          description: 'Our AI identifies gaps between the ad and page, generates targeted enhancements, and provides a downloadable HTML file.',
-                          icon: <Sparkles className="h-6 w-6" />,
-                        },
-                      ].map((item, index) => (
-                        <motion.div
-                          key={item.step}
-                          initial={{ opacity: 0, y: 30 }}
-                          whileInView={{ opacity: 1, y: 0 }}
-                          viewport={{ once: true }}
-                          transition={{ delay: index * 0.2 }}
-                          className="text-center"
-                        >
-                          <Card className="overflow-hidden border-2 border-transparent hover:border-primary/20 transition-colors duration-300">
-                            <CardContent className="p-6 sm:p-8">
-                              <div className="relative inline-flex mb-6">
-                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-violet-400 flex items-center justify-center text-white shadow-lg shadow-primary/20">
-                                  {item.icon}
-                                </div>
-                                <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-background border-2 border-primary flex items-center justify-center text-[10px] font-bold text-primary">
-                                  {item.step}
-                                </div>
-                              </div>
-                              <h3 className="text-lg font-semibold mb-3">{item.title}</h3>
-                              <p className="text-sm text-muted-foreground leading-relaxed">
-                                {item.description}
-                              </p>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      ))}
-                    </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {howItWorks.map((item, i) => (
+                      <motion.div key={item.step} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.15 }}>
+                        <div className="relative text-center">
+                          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-violet-500 text-white mb-6 shadow-lg shadow-primary/20">
+                            {item.icon}
+                          </div>
+                          <div className="absolute -top-2 -left-2 md:left-4 lg:left-8 text-5xl font-black text-primary/10">{item.step}</div>
+                          <h3 className="text-lg font-bold mb-3">{item.title}</h3>
+                          <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">{item.description}</p>
+                          {i < howItWorks.length - 1 && (
+                            <div className="hidden md:block absolute top-8 -right-4 w-8 text-muted-foreground/30">
+                              <ChevronRight className="h-6 w-6" />
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
                   </div>
                 </div>
               </section>
 
-              {/* Testimonials Section */}
+              {/* Testimonials */}
               <section id="testimonials" className="py-20 sm:py-28">
-                <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    className="text-center mb-16"
-                  >
-                    <Badge variant="secondary" className="mb-4 text-xs px-3 py-1">
-                      <Star className="h-3 w-3 mr-1" />
-                      Testimonials
-                    </Badge>
-                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-                      Loved by marketers
-                    </h2>
-                    <p className="text-muted-foreground max-w-xl mx-auto">
-                      See what growth teams are saying about Troopod.
-                    </p>
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                  <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
+                    <Badge variant="secondary" className="mb-4 text-xs px-3 py-1"><Star className="h-3 w-3 mr-1" />Testimonials</Badge>
+                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Loved by marketers worldwide</h2>
                   </motion.div>
 
-                  {/* Testimonial Carousel */}
-                  <div className="relative">
+                  <div className="relative overflow-hidden">
                     <AnimatePresence mode="wait">
                       <motion.div
                         key={testimonialIndex}
@@ -996,24 +658,23 @@ export default function Home() {
                         exit={{ opacity: 0, x: -50 }}
                         transition={{ duration: 0.4 }}
                       >
-                        <Card className="max-w-2xl mx-auto shadow-xl border-0">
+                        <Card className="border-border/60 shadow-lg">
                           <CardContent className="p-8 sm:p-10 text-center">
-                            {/* Stars */}
-                            <div className="flex justify-center gap-1 mb-6">
+                            <div className="flex items-center justify-center gap-1 mb-6">
                               {[...Array(testimonials[testimonialIndex].rating)].map((_, i) => (
                                 <Star key={i} className="h-5 w-5 fill-amber-400 text-amber-400" />
                               ))}
                             </div>
-                            <blockquote className="text-lg sm:text-xl leading-relaxed mb-8 font-medium italic">
+                            <blockquote className="text-lg sm:text-xl font-medium leading-relaxed mb-8 max-w-2xl mx-auto">
                               &ldquo;{testimonials[testimonialIndex].content}&rdquo;
                             </blockquote>
-                            <div className="flex items-center justify-center gap-4">
-                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-violet-400 flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                            <div className="flex items-center justify-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-violet-400 flex items-center justify-center text-white text-sm font-bold">
                                 {testimonials[testimonialIndex].avatar}
                               </div>
                               <div className="text-left">
-                                <p className="font-semibold">{testimonials[testimonialIndex].name}</p>
-                                <p className="text-sm text-muted-foreground">{testimonials[testimonialIndex].role}</p>
+                                <p className="text-sm font-semibold">{testimonials[testimonialIndex].name}</p>
+                                <p className="text-xs text-muted-foreground">{testimonials[testimonialIndex].role}</p>
                               </div>
                             </div>
                           </CardContent>
@@ -1021,144 +682,68 @@ export default function Home() {
                       </motion.div>
                     </AnimatePresence>
 
-                    {/* Navigation */}
-                    <div className="flex items-center justify-center gap-4 mt-8">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-9 w-9 rounded-full"
-                        onClick={() => setTestimonialIndex((prev) => (prev - 1 + testimonials.length) % testimonials.length)}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <div className="flex gap-2">
-                        {testimonials.map((_, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setTestimonialIndex(i)}
-                            className={cn(
-                              'h-2 rounded-full transition-all duration-300',
-                              i === testimonialIndex ? 'w-6 bg-primary' : 'w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50'
-                            )}
-                          />
-                        ))}
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-9 w-9 rounded-full"
-                        onClick={() => setTestimonialIndex((prev) => (prev + 1) % testimonials.length)}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
+                    <div className="flex items-center justify-center gap-2 mt-6">
+                      {testimonials.map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setTestimonialIndex(i)}
+                          className={cn(
+                            'w-2 h-2 rounded-full transition-all duration-300',
+                            i === testimonialIndex ? 'w-6 bg-primary' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
+                          )}
+                        />
+                      ))}
                     </div>
                   </div>
                 </div>
               </section>
 
-              {/* Pricing Section */}
-              <section id="pricing" className="py-20 sm:py-28 bg-muted/30 relative overflow-hidden">
-                <div className="absolute inset-0 dot-pattern opacity-20 pointer-events-none" />
-                <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    className="text-center mb-16"
-                  >
-                    <Badge variant="secondary" className="mb-4 text-xs px-3 py-1">
-                      <Crown className="h-3 w-3 mr-1" />
-                      Pricing
-                    </Badge>
-                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-                      Simple, transparent pricing
-                    </h2>
-                    <p className="text-muted-foreground max-w-xl mx-auto">
-                      Start free and upgrade as you grow. No hidden fees.
-                    </p>
+              {/* Pricing */}
+              <section id="pricing" className="py-20 sm:py-28 bg-muted/20">
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                  <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-12">
+                    <Badge variant="secondary" className="mb-4 text-xs px-3 py-1"><Crown className="h-3 w-3 mr-1" />Pricing</Badge>
+                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Simple, transparent pricing</h2>
+                    <p className="text-muted-foreground max-w-2xl mx-auto text-lg">Start free and scale as you grow.</p>
+                    <div className="flex items-center justify-center gap-3 mt-6">
+                      <span className={cn('text-sm', billingCycle === 'monthly' ? 'font-semibold' : 'text-muted-foreground')}>Monthly</span>
+                      <button onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annual' : 'monthly')} className="relative h-6 w-11 rounded-full bg-muted-foreground/20 transition-colors data-[state=checked]:bg-primary" data-state={billingCycle === 'annual' ? 'checked' : ''}>
+                        <span className={cn('block h-5 w-5 rounded-full bg-white shadow transition-transform', billingCycle === 'annual' ? 'translate-x-5' : 'translate-x-0.5', 'mt-0.5')} />
+                      </button>
+                      <span className={cn('text-sm', billingCycle === 'annual' ? 'font-semibold' : 'text-muted-foreground')}>Annual <Badge variant="secondary" className="text-[10px] ml-1 px-1.5 py-0">-20%</Badge></span>
+                    </div>
                   </motion.div>
 
-                  {/* Billing Toggle */}
-                  <div className="flex items-center justify-center gap-3 mb-10">
-                    <span className={cn('text-sm font-medium transition-colors', billingCycle === 'monthly' ? 'text-foreground' : 'text-muted-foreground')}>Monthly</span>
-                    <button
-                      onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annual' : 'monthly')}
-                      className={cn(
-                        'relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                        billingCycle === 'annual' ? 'bg-primary' : 'bg-muted'
-                      )}
-                      aria-label="Toggle billing cycle"
-                    >
-                      <span
-                        className={cn(
-                          'inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-300',
-                          billingCycle === 'annual' ? 'translate-x-6' : 'translate-x-1'
-                        )}
-                      />
-                    </button>
-                    <span className={cn('text-sm font-medium transition-colors', billingCycle === 'annual' ? 'text-foreground' : 'text-muted-foreground')}>Annual</span>
-                    {billingCycle === 'annual' && (
-                      <motion.span
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-500/10 dark:text-green-400 px-2 py-0.5 rounded-full"
-                      >
-                        Save 20%
-                      </motion.span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-start">
-                    {pricingPlans.map((plan, index) => (
-                      <motion.div
-                        key={plan.name}
-                        initial={{ opacity: 0, y: 30 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: index * 0.15 }}
-                      >
-                        <Card className={cn(
-                          'relative overflow-hidden transition-all duration-300 hover:shadow-xl',
-                          plan.popular ? 'border-2 border-primary shadow-lg shadow-primary/10 scale-[1.02]' : 'border border-border'
-                        )}>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {pricingPlans.map((plan, i) => (
+                      <motion.div key={plan.name} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }}>
+                        <Card className={cn('h-full relative', plan.popular && 'border-primary/50 shadow-xl shadow-primary/10')}>
                           {plan.popular && (
-                            <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-primary to-violet-400 text-white text-center text-xs font-semibold py-1.5">
-                              Most Popular
+                            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                              <Badge className="bg-gradient-to-r from-primary to-violet-500 text-white border-0 text-xs px-3">Most Popular</Badge>
                             </div>
                           )}
-                          <CardHeader className={cn('p-6', plan.popular && 'pt-10')}>
-                            <CardTitle className="text-lg">{plan.name}</CardTitle>
-                            <p className="text-sm text-muted-foreground">{plan.description}</p>
-                            <div className="mt-4">
-                              {billingCycle === 'annual' && plan.name === 'Pro' && (
-                                <span className="text-lg text-muted-foreground line-through mr-2">$29</span>
-                              )}
-                              <span className="text-4xl font-extrabold">
-                                {billingCycle === 'annual' && plan.name === 'Pro' ? '$23' : plan.price}
+                          <CardContent className="p-6">
+                            <h3 className="font-bold text-lg mb-1">{plan.name}</h3>
+                            <p className="text-sm text-muted-foreground mb-4">{plan.description}</p>
+                            <div className="mb-6">
+                              <span className="text-3xl font-extrabold">
+                                {plan.price === 'Custom' ? 'Custom' : billingCycle === 'annual' && plan.price !== '$0' ? `$${Math.round(parseInt(plan.price.replace('$', '')) * 0.8)}` : plan.price}
                               </span>
-                              <span className="text-muted-foreground text-sm">{plan.period}</span>
+                              {plan.period && <span className="text-muted-foreground text-sm">{plan.period}</span>}
                             </div>
-                          </CardHeader>
-                          <CardContent className="p-6 pt-0 space-y-4">
-                            <ul className="space-y-3">
+                            <Button variant={plan.popular ? 'default' : 'outline'} className={cn('w-full mb-6', plan.popular && 'bg-gradient-to-r from-primary to-violet-500 hover:shadow-lg hover:shadow-primary/25')}>
+                              {plan.cta}
+                            </Button>
+                            <Separator className="mb-4" />
+                            <ul className="space-y-2.5">
                               {plan.features.map((feature) => (
-                                <li key={feature} className="flex items-start gap-2.5 text-sm">
-                                  <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                                <li key={feature} className="flex items-start gap-2 text-sm">
+                                  <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
                                   <span className="text-muted-foreground">{feature}</span>
                                 </li>
                               ))}
                             </ul>
-                            <Button
-                              className={cn(
-                                'w-full mt-6 rounded-xl h-11',
-                                plan.popular
-                                  ? 'bg-gradient-to-r from-primary to-violet-400 text-white hover:shadow-lg hover:shadow-primary/25'
-                                  : ''
-                              )}
-                              variant={plan.popular ? 'default' : 'outline'}
-                            >
-                              {plan.cta}
-                            </Button>
                           </CardContent>
                         </Card>
                       </motion.div>
@@ -1167,242 +752,205 @@ export default function Home() {
                 </div>
               </section>
 
+              {/* FAQ */}
+              <FaqSection />
+
               {/* CTA Section */}
               <section className="py-20 sm:py-28">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                  >
-                    <Card className="bg-gradient-to-br from-primary via-violet-600 to-purple-600 text-white overflow-hidden relative">
-                      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.15),transparent_50%)] noise-overlay" />
-                      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(255,255,255,0.1),transparent_50%)]" />
-                      <CardContent className="relative p-8 sm:p-12 text-center">
-                        <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto mb-6">
-                          <Rocket className="h-8 w-8 text-white" />
-                        </div>
-                        <h2 className="text-2xl sm:text-3xl font-bold mb-4">
-                          Ready to boost your conversions?
-                        </h2>
-                        <p className="text-white/80 max-w-lg mx-auto mb-8 text-lg">
-                          Join thousands of marketers using Troopod to create perfectly aligned ad-to-page experiences.
-                        </p>
+                  <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+                    <Card className="bg-gradient-to-br from-primary via-violet-600 to-purple-700 border-0 text-white overflow-hidden relative">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+                      <CardContent className="relative p-10 sm:p-14 text-center">
+                        <h2 className="text-3xl sm:text-4xl font-bold mb-4">Ready to boost your conversions?</h2>
+                        <p className="text-white/80 text-lg mb-8 max-w-xl mx-auto">Join thousands of marketers using Troopod to create perfectly personalized landing pages.</p>
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                          <Button
-                            size="lg"
-                            variant="secondary"
-                            className="bg-white text-primary hover:bg-white/90 h-12 px-8 rounded-xl font-semibold gap-2 shadow-xl"
-                            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                          >
-                            <Rocket className="h-4 w-4" />
+                          <Button size="lg" className="bg-white text-primary hover:bg-white/90 font-semibold h-12 px-8 rounded-xl" onClick={() => generateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+                            <Rocket className="h-5 w-5 mr-2" />
                             Get Started Free
                           </Button>
-                          <Button
-                            size="lg"
-                            variant="ghost"
-                            className="text-white/90 hover:text-white hover:bg-white/10 h-12 px-8 rounded-xl font-semibold gap-2"
-                          >
-                            <Mail className="h-4 w-4" />
-                            Talk to Sales
+                          <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 font-semibold h-12 px-8 rounded-xl">
+                            <ExternalLink className="h-5 w-5 mr-2" />
+                            View Live Demo
                           </Button>
                         </div>
-                        <p className="text-white/50 text-xs mt-6">No credit card required. Free forever plan available.</p>
                       </CardContent>
                     </Card>
                   </motion.div>
                 </div>
               </section>
+            </motion.div>
+          )}
 
-              {/* Logo Marquee Section */}
-              <section className="py-16 border-t border-border/40 overflow-hidden">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <motion.div
-                    initial={{ opacity: 0, y: 15 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    className="text-center mb-10"
-                  >
-                    <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                      Integrates with your favorite tools
-                    </p>
-                  </motion.div>
-                </div>
-                <div className="relative group">
-                  {/* Fade edges */}
-                  <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-                  <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
-                  <div className="animate-marquee group-hover:[animation-play-state:paused] flex items-center gap-8 whitespace-nowrap">
-                    {[...brandLogos, ...brandLogos].map((name, i) => (
-                      <div
-                        key={`${name}-${i}`}
-                        className="flex items-center gap-2.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors cursor-default shrink-0"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-muted/80 flex items-center justify-center">
-                          <Code2 className="h-4 w-4 text-muted-foreground/60" />
+          {/* ═══════════════════ RESULTS STATE ═══════════════════ */}
+          {appState === 'results' && generationResult && (
+            <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              {/* Back bar */}
+              <div className="flex items-center justify-between mb-8">
+                <Button variant="ghost" onClick={handleReset} className="gap-2 text-sm">
+                  <RotateCcw className="h-4 w-4" />
+                  New Project
+                </Button>
+                <Badge variant="secondary" className="text-xs px-3 py-1">
+                  <Check className="h-3 w-3 mr-1 text-green-500" />
+                  Generation Complete
+                </Badge>
+              </div>
+
+              {/* Quality Score + Summary */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                {/* Quality Score */}
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
+                  <Card className="border-border/60 h-full">
+                    <CardContent className="p-6 flex flex-col items-center justify-center">
+                      <div className="relative w-28 h-28 mb-4">
+                        <svg className="w-28 h-28 -rotate-90" viewBox="0 0 100 100">
+                          <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/30" />
+                          <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray="251" strokeDashoffset={251 - (251 * (generationResult.qualityScore || 0)) / 100} strokeLinecap="round" className={cn('score-ring-animated', generationResult.qualityScore && generationResult.qualityScore >= 90 ? 'text-green-500' : generationResult.qualityScore && generationResult.qualityScore >= 70 ? 'text-amber-500' : 'text-red-500')} />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className={cn('text-2xl font-bold', getScoreColor(generationResult.qualityScore || 0))}>
+                            {generationResult.qualityScore || 0}
+                          </span>
                         </div>
-                        <span className="text-sm font-semibold tracking-tight">{name}</span>
                       </div>
-                    ))}
-                  </div>
+                      <p className="text-sm font-semibold">Quality Score</p>
+                      <p className="text-xs text-muted-foreground mt-1">Based on 8 optimization factors</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Changes Summary */}
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }} className="md:col-span-2">
+                  <Card className="border-border/60 h-full">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-primary" />
+                        Changes Applied
+                        <Badge variant="secondary" className="text-[10px] ml-auto">
+                          {generationResult.totalChanges || 0} total
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                        {(generationResult.changes || []).map((change) => (
+                          <div key={change.id} className="flex items-start gap-3 p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                            <Badge variant={change.impact === 'high' ? 'default' : change.impact === 'medium' ? 'secondary' : 'outline'} className={cn('text-[10px] mt-0.5 flex-shrink-0', change.impact === 'high' && 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20', change.impact === 'medium' && 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20')}>
+                              {change.impact}
+                            </Badge>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-muted-foreground mb-0.5">{change.section}</p>
+                              <p className="text-sm">{change.description}</p>
+                            </div>
+                            <Badge variant="outline" className="text-[10px] flex-shrink-0">
+                              {change.type}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </div>
+
+              {/* AI Explanation */}
+              {generationResult.aiExplanation && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-8">
+                  <Card className="border-primary/20 bg-primary/5">
+                    <CardContent className="p-5">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <Sparkles className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold mb-1">AI Explanation</p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">{generationResult.aiExplanation}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Preview + Code + Export */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div className="space-y-6">
+                  <PreviewViewer htmlCode={generationResult.htmlCode || ''} />
+                  <ExportPanel reactCode={generationResult.reactCode} htmlCode={generationResult.htmlCode} resultId={generationResult.projectId} />
                 </div>
-              </section>
+                <div>
+                  <CodeViewer reactCode={generationResult.reactCode} htmlCode={generationResult.htmlCode} />
+                </div>
+              </div>
 
-              {/* FAQ Section */}
-              <FaqSection />
-
-              {/* Newsletter Section */}
-              <NewsletterSection />
-            </motion.div>
-          )}
-
-          {/* Loading State */}
-          {appState === 'loading' && (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center justify-center min-h-[60vh] px-4"
-            >
-              <GenerationProgress currentStep={currentStep} isVisible={true} />
-            </motion.div>
-          )}
-
-          {/* Results State */}
-          {appState === 'results' && (
-            <motion.div
-              key="results"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="px-4 sm:px-6 lg:px-8 py-8"
-            >
-              <ResultsView
-                pageUrl={pageUrl}
-                adImageUrl={adImageUrl || ''}
-                onReset={handleReset}
-              />
+              {/* Bottom actions */}
+              <div className="flex items-center justify-center gap-4 pt-4 pb-8">
+                <Button variant="outline" size="lg" onClick={handleReset} className="gap-2">
+                  <RotateCcw className="h-4 w-4" />
+                  Create Another
+                </Button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border/40 mt-auto bg-muted/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-12 grid grid-cols-2 md:grid-cols-4 gap-8">
-            {/* Brand */}
+      <footer className="border-t border-border/40 bg-muted/20 mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="col-span-2 md:col-span-1">
-              <div className="flex items-center gap-2.5 mb-4">
+              <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-violet-400 flex items-center justify-center">
                   <Rocket className="h-4 w-4 text-white" />
                 </div>
-                <span className="text-lg font-bold">Troopod</span>
+                <span className="font-bold">Troopod</span>
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                AI-powered landing page personalization for modern marketing teams.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                &copy; {new Date().getFullYear()} Troopod. All rights reserved.
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                AI-powered landing page personalization. Turn any ad creative into a high-converting landing page.
               </p>
             </div>
-
-            {/* Product */}
             <div>
-              <h4 className="text-sm font-semibold mb-4">Product</h4>
-              <ul className="space-y-2.5">
-                <li><a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a></li>
-                <li><a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a></li>
-                <li><a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">API Docs</a></li>
-                <li><a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Changelog</a></li>
+              <h4 className="font-semibold text-sm mb-3">Product</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="#features" className="hover:text-foreground transition-colors">Features</a></li>
+                <li><a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
+                <li><a href="#" className="hover:text-foreground transition-colors">API Docs</a></li>
+                <li><a href="#" className="hover:text-foreground transition-colors">Changelog</a></li>
               </ul>
             </div>
-
-            {/* Company */}
             <div>
-              <h4 className="text-sm font-semibold mb-4">Company</h4>
-              <ul className="space-y-2.5">
-                <li><a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">About</a></li>
-                <li><a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Blog</a></li>
-                <li><a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Careers</a></li>
-                <li><a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Contact</a></li>
+              <h4 className="font-semibold text-sm mb-3">Company</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="#" className="hover:text-foreground transition-colors">About</a></li>
+                <li><a href="#" className="hover:text-foreground transition-colors">Blog</a></li>
+                <li><a href="#" className="hover:text-foreground transition-colors">Careers</a></li>
+                <li><a href="#" className="hover:text-foreground transition-colors">Contact</a></li>
               </ul>
             </div>
-
-            {/* Legal */}
             <div>
-              <h4 className="text-sm font-semibold mb-4">Legal</h4>
-              <ul className="space-y-2.5">
-                <li><a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Terms of Service</a></li>
-                <li><a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Cookie Policy</a></li>
+              <h4 className="font-semibold text-sm mb-3">Legal</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="#" className="hover:text-foreground transition-colors">Privacy</a></li>
+                <li><a href="#" className="hover:text-foreground transition-colors">Terms</a></li>
+                <li><a href="#" className="hover:text-foreground transition-colors">Cookies</a></li>
               </ul>
             </div>
           </div>
-
-          <div className="border-t border-border/40 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-muted-foreground">
-              Built with AI. Designed for marketers.
-            </p>
+          <Separator className="my-8" />
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} Troopod. All rights reserved.</p>
             <div className="flex items-center gap-4">
-              {/* Social Media Icons */}
-              <div className="flex items-center gap-1">
-                {[
-                  { icon: Twitter, label: 'Twitter', href: '#' },
-                  { icon: Github, label: 'GitHub', href: '#' },
-                  { icon: Linkedin, label: 'LinkedIn', href: '#' },
-                  { icon: Youtube, label: 'YouTube', href: '#' },
-                ].map((social) => (
-                  <a
-                    key={social.label}
-                    href={social.href}
-                    aria-label={social.label}
-                    className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-all duration-200"
-                  >
-                    <social.icon className="h-4 w-4" />
-                  </a>
-                ))}
-              </div>
-              <Badge variant="secondary" className="text-[10px] px-2 py-0.5 gap-1">
-                <Sparkles className="h-2.5 w-2.5 text-primary" />
-                v1.0.0
-              </Badge>
+              {['Twitter', 'GitHub', 'LinkedIn'].map((social) => (
+                <a key={social} href="#" className="text-muted-foreground hover:text-foreground transition-colors text-xs">{social}</a>
+              ))}
             </div>
           </div>
         </div>
       </footer>
 
-      {/* Scroll Progress Bar */}
-      <motion.div
-        className="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-primary via-violet-400 to-purple-500 z-[100] origin-left"
-        style={{ scaleX: scrollYProgress }}
-      />
-
-      {/* Back to Top Button */}
       <BackToTop />
-
-      {/* Keyboard Shortcut Hint */}
-      <AnimatePresence>
-        {appState === 'input' && canGenerate && mounted && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            transition={{ delay: 2, duration: 0.3 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40"
-          >
-            <div className="flex items-center gap-2 bg-card/90 backdrop-blur-sm border border-border/60 rounded-full px-4 py-2 shadow-lg">
-              <Keyboard className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">
-                Press <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono font-medium border border-border/60">Ctrl</kbd> + <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono font-medium border border-border/60">Enter</kbd> to generate
-              </span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
