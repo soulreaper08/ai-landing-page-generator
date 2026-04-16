@@ -2,6 +2,120 @@
 
 ---
 
+## VLM Bug Fix + Stability Session — 2026-04-20 (Task 1)
+
+### Overall Assessment: ✅ Stable
+- **ESLint**: Zero errors, zero warnings
+- **Dev Server**: Compiling successfully, all routes returning 200
+
+### Bugs Fixed
+
+#### 1. 🔴 Intermittent VLM Image Format Error (Code 1210)
+- **Issue**: VLM API returning `{"error":{"code":"1210","message":"图片输入格式/解析错误"}}` intermittently
+- **Root cause**: Base64 data URL could have whitespace/newlines, and very large uncompressed images were being sent
+- **Fixes applied**:
+  - Added `cleanBase64Image()` function to strip whitespace and validate data URL format
+  - Added client-side image compression (max 800px dimension, JPEG quality 0.8) in `image-upload-zone.tsx`
+  - Replaced `readFileAsBase64` with `compressImage` using Canvas API for all upload methods (drag-drop, file input, clipboard paste)
+
+#### 2. 🟡 VLM Response Returning Prompt Text as Headline
+- **Issue**: Sometimes `Ad analysis complete:` showed empty headline or the analysis prompt text itself
+- **Root cause**: VLM occasionally returned non-JSON or JSON with the prompt text embedded
+- **Fixes applied**:
+  - Added `isValidAnalysisHeadline()` validation function that rejects:
+    - Headlines starting with "Analyze", "Extract", "Please", "Here", "Output"
+    - Headlines containing "JSON" or markdown code fences
+    - Headlines shorter than 2 chars or longer than 100 chars
+  - Changed VLM system prompt from `role: 'assistant'` to `role: 'system'` for better instruction following
+  - Added `analyzeAdImageWithRetry()` wrapper with up to 2 retries + 1s delay between attempts
+
+### Files Modified
+- `src/app/api/generate/route.ts` — Added `cleanBase64Image()`, `isValidAnalysisHeadline()`, `analyzeAdImageWithRetry()`, improved VLM error handling
+- `src/components/image-upload-zone.tsx` — Added `compressImage()` with Canvas API, replaced all `readFileAsBase64` calls
+
+### Project Status
+- ✅ ESLint: 0 errors, 0 warnings
+- ✅ Dev server: Compiling successfully
+- ✅ All routes: 200 status
+- ✅ VLM pipeline: Robust with retry + fallback + validation
+
+---
+
+## Visual QA + Enhancement Session — 2026-04-20 (Task 2)
+
+### QA Results
+
+**ESLint**: ✅ Zero errors, zero warnings  
+**Dev Server**: ✅ Compiling successfully  
+**Browser QA**: ✅ All sections rendering correctly (68 headings/links/buttons counted)
+
+**Sections Verified via agent-browser snapshot:**
+- ✅ Navbar with logo, navigation links, dark mode toggle, history button
+- ✅ Hero section with badge, headline, subheadline, CTA
+- ✅ Image upload zone and URL input area (2-step flow)
+- ✅ Demo sample cards (SaaS, E-commerce, Fitness)
+- ✅ Brand logo marquee with scrolling animation
+- ✅ Stats section with animated counters
+- ✅ Features grid (6 cards with glass effect)
+- ✅ How It Works (3 steps with gradient borders)
+- ✅ Testimonials carousel with quote marks
+- ✅ Pricing section (3 plans with shimmer badge)
+- ✅ FAQ section (6 questions, collapsible with animations)
+- ✅ Footer with newsletter, social links, copyright
+
+**No visual bugs detected.** All previously identified issues from Round 4 have been resolved.
+
+### What Changed This Session
+
+#### 1. Enhanced Generation Progress Bar (`src/components/generation-progress-bar.tsx`)
+- **Smoother sub-step interpolation**: Replaced Framer Motion `animate` width with custom `requestAnimationFrame` loop using ease-out cubic easing for fluid, non-jumpy progress transitions
+- **Glowing progress head**: Added a radial gradient dot at the leading edge of the progress bar with animated shadow glow (`shadow-[0_0_8px_2px_...]`)
+- **Animated shimmer**: Improved shimmer sweep from `via-white/30` to `via-white/40` for more visible motion
+- **Background pulse**: Added subtle pulsing opacity behind the progress track
+- **Step indicator dots**: Added 6 mini step dots below the progress label showing current, complete, and pending states with a pulsing animation on the active step
+- **Thicker bar**: Increased from 1px to 3px for better visibility
+
+#### 2. Enhanced FAQ Section (`src/components/faq-section.tsx`)
+- **Spring physics**: Changed height/opacity animation from cubic-bezier to spring physics (`stiffness: 400, damping: 35`) for natural, bouncy open/close motion
+- **Chevron rotation**: Upgraded from `duration: 0.3` to `type: 'spring', stiffness: 300, damping: 25` for satisfying click feedback
+- **Active state glow**: Added shadow-sm shadow-primary/10 to the chevron circle when open for subtle depth
+- **Content animation**: Added `motion.div` wrapper inside the answer with y-offset animation (`opacity: 0, y: -4 → opacity: 1, y: 0`) for a smooth slide-down effect
+- **Gradient divider**: Changed separator line from `via-border/60` to `via-primary/20` for better accent color theming
+
+#### 3. Enhanced Footer (`src/app/page.tsx` + `src/app/globals.css`)
+- **Animated footer separator glow**: Added `.footer-separator-glow` — a traveling gradient light that continuously sweeps across the footer separator (4s animation cycle)
+- **Social link hover glow**: Added `.footer-social-link::before` with gradient background that fades in on hover, creating a subtle halo effect
+- **Improved social links**: Added `group` class and `transition-colors` to icon SVGs for proper color transitions
+- **Copyright text**: Already present — verified working (`© 2026 Troopod. All rights reserved. Built with ❤️ for marketers.`)
+
+#### 4. Enhanced Gradient Line Separator (`src/app/globals.css`)
+- **Wider glow**: Increased radial gradient size from 60px to 80px for more prominent center glow
+- **Added violet tint**: Enhanced radial gradient with a secondary violet color stop for richer appearance
+- **Pulse animation**: Added `sep-pulse` keyframe animation that subtly pulses the separator opacity (0.6 → 1.0 → 0.6 over 3s) for a breathing effect
+- **Combined animation**: Both flow and pulse run simultaneously for a layered visual effect
+- **Increased blur**: From 4px to 6px for softer, more elegant glow
+
+### Files Modified
+- `src/components/generation-progress-bar.tsx` — Rewritten with smooth interpolation and enhanced visual design
+- `src/components/faq-section.tsx` — Enhanced animations with spring physics and gradient accents
+- `src/app/page.tsx` — Footer separator and social links updated
+- `src/app/globals.css` — Footer separator glow, social link hover glow, gradient separator enhancements
+
+### QA Results (Task 2)
+- ✅ ESLint: 0 errors, 0 warnings
+- ✅ Dev Server: Compiling successfully
+- ✅ Hero section: Visible with all input elements
+- ✅ Brand marquee: Scrolling animation working
+- ✅ Stats: Animated counters visible
+- ✅ Features: 6 glass-effect cards rendered
+- ✅ How It Works: 3 gradient-bordered steps
+- ✅ Testimonials: Carousel with quote marks
+- ✅ Pricing: 3 plans with shimmer badge
+- ✅ FAQ: 6 collapsible items with spring animations
+- ✅ Footer: Newsletter, social links, copyright, traveling glow separator
+
+---
+
 ## Major Redesign Session — 2026-04-19 (Round 4)
 
 ### Overall Assessment: ✅ Clean Redesign
@@ -232,8 +346,9 @@ This session addressed user frustration with branding, UX complexity, and code q
 ---
 
 ## Unresolved Issues / Risks
-1. **Generation time** — LLM code generation takes ~49s; could be optimized with streaming
+1. **Generation time** — LLM code generation takes ~40-50s; could be optimized with streaming
 2. **Cross-origin warning** — Next.js dev server cross-origin warning for preview panel (cosmetic)
+3. **VLM intermittent failures** — Mitigated with retry + validation + fallback, but large images may still fail occasionally
 
 ---
 

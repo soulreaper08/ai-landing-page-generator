@@ -16,6 +16,9 @@ import { FaqSection } from '@/components/faq-section';
 import { BackToTop } from '@/components/back-to-top';
 import { ScrollProgress } from '@/components/scroll-progress';
 import { AnimatedCounter } from '@/components/animated-counter';
+import { GenerationProgressBar } from '@/components/generation-progress-bar';
+import { ResultsStats } from '@/components/results-stats';
+import { ColorPaletteDisplay } from '@/components/color-palette-display';
 import {
   Rocket,
   Sparkles,
@@ -44,12 +47,7 @@ import {
   Target,
   MousePointerClick,
   RotateCcw,
-  ShoppingBag,
-  Dumbbell,
-  Building2,
-  GraduationCap,
-  Landmark,
-  MonitorSmartphone,
+  RefreshCw,
   Maximize,
   Copy,
   ArrowLeftRight,
@@ -58,6 +56,7 @@ import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { AppState, StitchGenerationResult } from '@/lib/types';
+import { AnimatedSection } from '@/lib/use-section-animation';
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 
@@ -421,6 +420,11 @@ export default function Home() {
 
       <HistoryDrawer open={historyOpen} onOpenChange={setHistoryOpen} onLoadHistory={handleLoadHistory} />
 
+      {/* Generation Progress Bar */}
+      <AnimatePresence>
+        {appState === 'loading' && <GenerationProgressBar currentStep={currentStep} />}
+      </AnimatePresence>
+
       {/* Loading Overlay */}
       <AnimatePresence>
         {appState === 'loading' && <LoadingAnimation currentStep={currentStep} />}
@@ -576,7 +580,11 @@ export default function Home() {
                 </motion.div>
               </section>
 
+              {/* Gradient Line Separator */}
+              <div className="gradient-line-separator" aria-hidden="true" />
+
               {/* Brand Logo Marquee */}
+              <AnimatedSection direction="fade" delay={0.1}>
               <section className="py-10 border-y border-border/30 bg-muted/5 relative overflow-hidden">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <p className="text-center text-xs font-medium text-muted-foreground uppercase tracking-widest mb-6">Trusted by 2,500+ teams worldwide</p>
@@ -593,8 +601,13 @@ export default function Home() {
                   </div>
                 </div>
               </section>
+              </AnimatedSection>
+
+              {/* Gradient Line Separator */}
+              <div className="gradient-line-separator" aria-hidden="true" />
 
               {/* Stats Section */}
+              <AnimatedSection direction="fade">
               <section className="py-16 bg-gradient-to-b from-transparent via-primary/5 to-transparent">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="text-center mb-10">
@@ -607,8 +620,13 @@ export default function Home() {
                   </div>
                 </div>
               </section>
+              </AnimatedSection>
+
+              {/* Gradient Line Separator */}
+              <div className="gradient-line-separator" aria-hidden="true" />
 
               {/* Features Section */}
+              <AnimatedSection direction="up" delay={0.1}>
               <section id="features" className="py-20 sm:py-28">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-14">
@@ -643,8 +661,13 @@ export default function Home() {
                   </div>
                 </div>
               </section>
+              </AnimatedSection>
+
+              {/* Gradient Line Separator */}
+              <div className="gradient-line-separator" aria-hidden="true" />
 
               {/* How It Works */}
+              <AnimatedSection direction="up" delay={0.1}>
               <section id="how-it-works" className="py-20 sm:py-28 bg-muted/20">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-14">
@@ -687,8 +710,13 @@ export default function Home() {
                   </div>
                 </div>
               </section>
+              </AnimatedSection>
+
+              {/* Gradient Line Separator */}
+              <div className="gradient-line-separator" aria-hidden="true" />
 
               {/* Testimonials */}
+              <AnimatedSection direction="up" delay={0.1}>
               <section id="testimonials" className="py-20 sm:py-28">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-14">
@@ -747,8 +775,13 @@ export default function Home() {
                   </div>
                 </div>
               </section>
+              </AnimatedSection>
+
+              {/* Gradient Line Separator */}
+              <div className="gradient-line-separator" aria-hidden="true" />
 
               {/* Pricing */}
+              <AnimatedSection direction="up" delay={0.1}>
               <section id="pricing" className="py-20 sm:py-28 bg-muted/20">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-14">
@@ -807,9 +840,15 @@ export default function Home() {
                   </div>
                 </div>
               </section>
+              </AnimatedSection>
+
+              {/* Gradient Line Separator */}
+              <div className="gradient-line-separator" aria-hidden="true" />
 
               {/* FAQ */}
+              <AnimatedSection direction="up" delay={0.1}>
               <FaqSection />
+              </AnimatedSection>
 
             </motion.div>
           )}
@@ -828,6 +867,16 @@ export default function Home() {
                   Generation Complete
                 </Badge>
               </div>
+
+              {/* Results Dashboard Stats */}
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-6">
+                <ResultsStats htmlCode={generationResult.htmlCode} totalChanges={generationResult.totalChanges} />
+              </motion.div>
+
+              {/* Color Palette */}
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="mb-8">
+                <ColorPaletteDisplay />
+              </motion.div>
 
               {/* Quality Score + Changes Summary */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -992,6 +1041,19 @@ export default function Home() {
                   <RotateCcw className="h-4 w-4" />
                   Create Another
                 </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="gap-2 border-primary/30 text-primary hover:bg-primary/5"
+                  onClick={() => {
+                    if (!adImageUrl || !pageUrl) return;
+                    toast.info('Regenerating with same inputs...');
+                    handleGenerate();
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Regenerate
+                </Button>
               </motion.div>
 
               {/* Ad Creative Reference */}
@@ -1015,8 +1077,10 @@ export default function Home() {
         </AnimatePresence>
       </main>
 
-      {/* Footer separator */}
-      <div className="footer-gradient-sep" />
+      {/* Footer separator with animated gradient */}
+      <div className="footer-gradient-sep relative">
+        <div className="footer-separator-glow" aria-hidden="true" />
+      </div>
 
       {/* Footer */}
       <footer className="footer-dark-gradient mt-auto">
@@ -1053,15 +1117,19 @@ export default function Home() {
               <p className="text-sm text-muted-foreground leading-relaxed mb-4">
                 AI-powered landing page personalization. Turn any ad creative into a high-converting landing page.
               </p>
-              <div className="flex items-center gap-2">
-                <a href="#" className="w-8 h-8 rounded-lg bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors" aria-label="GitHub">
-                  <Github className="h-4 w-4 text-muted-foreground" />
+              {/* Social links with hover gradient glow */}
+              <div className="flex items-center gap-2.5">
+                <a href="https://github.com/troopod" target="_blank" rel="noopener noreferrer" className="footer-social-link w-9 h-9 rounded-lg bg-muted/50 hover:bg-muted flex items-center justify-center transition-all duration-300 hover:shadow-sm hover:-translate-y-0.5 group" aria-label="GitHub">
+                  <Github className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </a>
-                <a href="#" className="w-8 h-8 rounded-lg bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors" aria-label="Twitter">
-                  <svg className="h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></svg>
+                <a href="https://twitter.com/troopod" target="_blank" rel="noopener noreferrer" className="footer-social-link w-9 h-9 rounded-lg bg-muted/50 hover:bg-muted flex items-center justify-center transition-all duration-300 hover:shadow-sm hover:-translate-y-0.5 group" aria-label="Twitter/X">
+                  <svg className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></svg>
                 </a>
-                <a href="#" className="w-8 h-8 rounded-lg bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors" aria-label="LinkedIn">
-                  <svg className="h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                <a href="https://linkedin.com/company/troopod" target="_blank" rel="noopener noreferrer" className="footer-social-link w-9 h-9 rounded-lg bg-muted/50 hover:bg-muted flex items-center justify-center transition-all duration-300 hover:shadow-sm hover:-translate-y-0.5 group" aria-label="LinkedIn">
+                  <svg className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                </a>
+                <a href="https://youtube.com/@troopod" target="_blank" rel="noopener noreferrer" className="footer-social-link w-9 h-9 rounded-lg bg-muted/50 hover:bg-muted flex items-center justify-center transition-all duration-300 hover:shadow-sm hover:-translate-y-0.5 group" aria-label="YouTube">
+                  <svg className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3z"/></svg>
                 </a>
               </div>
             </div>
@@ -1094,15 +1162,17 @@ export default function Home() {
           </div>
           <Separator className="my-8" />
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} Troopod. All rights reserved.</p>
-            <div className="flex items-center gap-2">
-              <a href="#" className="w-7 h-7 rounded-md bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors" aria-label="GitHub">
+            <p className="text-xs text-muted-foreground">
+              &copy; {new Date().getFullYear()} Troopod. All rights reserved. Built with ❤️ for marketers.
+            </p>
+            <div className="flex items-center gap-3">
+              <a href="https://github.com/troopod" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-md bg-muted/50 hover:bg-muted flex items-center justify-center transition-all duration-200 hover:-translate-y-0.5" aria-label="GitHub">
                 <Github className="h-3.5 w-3.5 text-muted-foreground" />
               </a>
-              <a href="#" className="w-7 h-7 rounded-md bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors" aria-label="Twitter">
+              <a href="https://twitter.com/troopod" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-md bg-muted/50 hover:bg-muted flex items-center justify-center transition-all duration-200 hover:-translate-y-0.5" aria-label="Twitter">
                 <svg className="h-3.5 w-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></svg>
               </a>
-              <a href="#" className="w-7 h-7 rounded-md bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors" aria-label="LinkedIn">
+              <a href="https://linkedin.com/company/troopod" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-md bg-muted/50 hover:bg-muted flex items-center justify-center transition-all duration-200 hover:-translate-y-0.5" aria-label="LinkedIn">
                 <svg className="h-3.5 w-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
               </a>
             </div>

@@ -1,16 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
 import { HelpCircle, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const faqs = [
   {
@@ -40,6 +35,12 @@ const faqs = [
 ];
 
 export function FaqSection() {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  const toggleFaq = (index: number) => {
+    setOpenIndex(openIndex === index ? null : index);
+  };
+
   return (
     <section className="py-20 sm:py-28">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -67,27 +68,86 @@ export function FaqSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.2 }}
+          className="space-y-3"
         >
-          <Card>
-            <CardContent className="p-2 sm:p-4">
-              <Accordion type="single" collapsible className="w-full">
-                {faqs.map((faq, index) => (
-                  <AccordionItem
-                    key={index}
-                    value={`item-${index}`}
-                    className="border-b-0 last:border-b-0"
-                  >
-                    <AccordionTrigger className="text-left text-sm sm:text-base font-medium hover:no-underline hover:bg-muted/50 px-4 py-4 rounded-lg data-[state=open]:bg-muted/50 transition-colors">
-                      {faq.question}
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4 pt-0 text-sm text-muted-foreground leading-relaxed">
-                      {faq.answer}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </CardContent>
-          </Card>
+          {faqs.map((faq, index) => {
+            const isOpen = openIndex === index;
+
+            return (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.25 + index * 0.05 }}
+              >
+                <Card
+                  className={cn(
+                    'overflow-hidden transition-all duration-300 cursor-pointer group',
+                    'hover:shadow-md hover:border-primary/20',
+                    isOpen && 'border-primary/30 shadow-md shadow-primary/5'
+                  )}
+                  onClick={() => toggleFaq(index)}
+                >
+                  <CardContent className="p-0">
+                    {/* Question (always visible) */}
+                    <button
+                      className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left"
+                      aria-expanded={isOpen}
+                    >
+                      <span className={cn(
+                        'text-sm sm:text-base font-medium transition-colors duration-200',
+                        isOpen ? 'text-primary' : 'text-foreground group-hover:text-primary/80'
+                      )}>
+                        {faq.question}
+                      </span>
+                      <motion.div
+                        animate={{ rotate: isOpen ? 180 : 0 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                        className={cn(
+                          'flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300',
+                          isOpen
+                            ? 'bg-primary/10 text-primary shadow-sm shadow-primary/10'
+                            : 'bg-muted/50 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary'
+                        )}
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </motion.div>
+                    </button>
+
+                    {/* Answer (animated open/close with spring physics) */}
+                    <AnimatePresence initial={false}>
+                      {isOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{
+                            height: { type: 'spring', stiffness: 400, damping: 35 },
+                            opacity: { duration: 0.2, delay: 0.05 },
+                          }}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-5 pb-4 pt-0">
+                            <motion.div
+                              initial={{ opacity: 0, y: -4 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.2, delay: 0.1 }}
+                            >
+                              <div className="h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent mb-3" />
+                              <p className="text-sm text-muted-foreground leading-relaxed">
+                                {faq.answer}
+                              </p>
+                            </motion.div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
         </motion.div>
       </div>
     </section>

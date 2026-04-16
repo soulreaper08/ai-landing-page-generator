@@ -1134,10 +1134,60 @@ html {
    FOOTER ENHANCEMENTS
    ════════════════════════════════════════════════════════════════ */
 
-/* Footer gradient separator */
+/* Footer gradient separator with animated glow */
 .footer-gradient-sep {
   height: 1px;
   background: linear-gradient(90deg, transparent 5%, oklch(0.606 0.25 292.717 / 0.15) 30%, oklch(0.702 0.183 293.541 / 0.1) 70%, transparent 95%);
+}
+
+/* Animated glow traveling along footer separator */
+@keyframes footer-glow-travel {
+  0% { left: -20%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { left: 120%; opacity: 0; }
+}
+
+.footer-separator-glow {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 9px;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.footer-separator-glow::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 120px;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, oklch(0.606 0.25 292.717 / 0.4), oklch(0.702 0.183 293.541 / 0.3), oklch(0.606 0.25 292.717 / 0.4), transparent);
+  border-radius: 0 0 4px 4px;
+  filter: blur(2px);
+  animation: footer-glow-travel 4s ease-in-out infinite;
+}
+
+/* Footer social link hover glow */
+.footer-social-link {
+  position: relative;
+}
+
+.footer-social-link::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, oklch(0.606 0.25 292.717 / 0.15), oklch(0.702 0.183 293.541 / 0.15));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.footer-social-link:hover::before {
+  opacity: 1;
 }
 
 /* Footer dark gradient */
@@ -1167,6 +1217,58 @@ html {
 .sparkline-bar {
   transition: height 0.3s ease-out;
   border-radius: 2px 2px 0 0;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ANIMATED GRADIENT LINE SEPARATOR
+   ════════════════════════════════════════════════════════════════ */
+
+@keyframes gradient-line-flow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.gradient-line-separator {
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(0.606 0.25 292.717 / 0.08) 15%,
+    oklch(0.606 0.25 292.717 / 0.25) 30%,
+    oklch(0.702 0.183 293.541 / 0.30) 50%,
+    oklch(0.606 0.25 292.717 / 0.25) 70%,
+    oklch(0.606 0.25 292.717 / 0.08) 85%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: gradient-line-flow 6s ease-in-out infinite;
+  position: relative;
+}
+
+.gradient-line-separator::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 8px;
+  background: radial-gradient(ellipse, oklch(0.606 0.25 292.717 / 0.4), oklch(0.702 0.183 293.541 / 0.25), transparent);
+  filter: blur(6px);
+  animation: gradient-line-flow 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ── Enhanced gradient line separator with pulse ── */
+@keyframes sep-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.gradient-line-separator {
+  animation: gradient-line-flow 6s ease-in-out infinite, sep-pulse 3s ease-in-out infinite;
 }
 
 /* ════════════════════════════════════════════════════════════════

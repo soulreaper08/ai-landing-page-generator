@@ -56,7 +56,7 @@ async function fullPipeline(
 
   // Step 1: Analyze ad image via VLM
   console.log('[Generate] Step 1: Analyzing ad image via VLM...');
-  const adAnalysis = await analyzeAdImage(zai, adImage);
+  const adAnalysis = await analyzeAdImageWithRetry(zai, adImage);
   console.log('[Generate] Ad analysis complete:', adAnalysis.headline);
 
   // Step 2: Scrape landing page
@@ -94,6 +94,32 @@ async function fullPipeline(
 
 // ─── VLM Ad Image Analysis ────────────────────────────────────────────────────
 
+function cleanBase64Image(dataUrl: string): string {
+  // Remove any whitespace, newlines from base64 data
+  let cleaned = dataUrl.replace(/\s+/g, '');
+  // Ensure proper data URL format
+  if (cleaned.startsWith('data:image/')) {
+    const mimeMatch = cleaned.match(/^data:(image\/\w+);base64,/);
+    if (mimeMatch) {
+      const mime = mimeMatch[1];
+      const base64 = cleaned.substring(mimeMatch[0].length);
+      // Reconstruct clean data URL (ensure JPEG or PNG mime)
+      return `data:${mime};base64,${base64}`;
+    }
+  }
+  return cleaned;
+}
+
+function isValidAnalysisHeadline(headline: string): boolean {
+  // Reject obviously invalid headlines
+  if (!headline || headline.length < 2) return false;
+  if (headline.length > 100) return false;
+  if (/^Analyze|^Extract|^Please|^Here|^Output/i.test(headline)) return false;
+  if (headline.includes('JSON')) return false;
+  if (headline.includes('```')) return false;
+  return true;
+}
+
 async function analyzeAdImage(zai: Awaited<ReturnType<typeof ZAI.create>>, imageInput: string): Promise<AdAnalysisResult> {
   const isBase64 = imageInput.startsWith('data:image/');
 
@@ -101,6 +127,11 @@ async function analyzeAdImage(zai: Awaited<ReturnType<typeof ZAI.create>>, image
     console.warn('[Generate] Image is not base64, using fallback');
     return buildFallbackAdAnalysis();
   }
+
+  // Clean the base64 image data
+  const cleanImage = cleanBase64Image(imageInput);
+  const base64SizeKB = Math.round((cleanImage.length * 3) / 4 / 1024);
+  console.log(`[Generate] Image base64 size: ~${base64SizeKB}KB`);
 
   const analysisPrompt = `Analyze this advertisement image and extract:
 
@@ -140,12 +171,12 @@ Respond ONLY with valid JSON in this exact format:
     const response = await zai.chat.completions.createVision({
       model: 'glm-4.6v',
       messages: [
-        { role: 'assistant', content: [{ type: 'text', text: 'Output only valid JSON, no markdown or code fences.' }] },
+        { role: 'system', content: 'You are an expert ad creative analyst. You ONLY output valid JSON. No markdown, no explanation, no code fences. Just raw JSON.' },
         {
           role: 'user',
           content: [
             { type: 'text', text: analysisPrompt },
-            { type: 'image_url', image_url: { url: imageInput } },
+            { type: 'image_url', image_url: { url: cleanImage } },
           ],
         },
       ],
@@ -153,11 +184,35 @@ Respond ONLY with valid JSON in this exact format:
     });
 
     const raw = response.choices?.[0]?.message?.content ?? '';
-    return parseAdAnalysis(raw);
+    const parsed = parseAdAnalysis(raw);
+    
+    // Validate the parsed result - if headline looks invalid, use fallback
+    if (!isValidAnalysisHeadline(parsed.headline)) {
+      console.warn('[Generate] VLM returned invalid headline, using fallback:', parsed.headline?.substring(0, 50));
+      return buildFallbackAdAnalysis();
+    }
+    
+    return parsed;
   } catch (error) {
     console.warn('[Generate] VLM analysis failed:', error);
     return buildFallbackAdAnalysis();
   }
+}
+
+// Retry wrapper for VLM analysis
+async function analyzeAdImageWithRetry(zai: Awaited<ReturnType<typeof ZAI.create>>, imageInput: string, maxRetries = 2): Promise<AdAnalysisResult> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const result = await analyzeAdImage(zai, imageInput);
+    // If result is valid (not a fallback), return it
+    if (isValidAnalysisHeadline(result.headline)) {
+      return result;
+    }
+    if (attempt < maxRetries) {
+      console.log(`[Generate] Retrying VLM analysis (attempt ${attempt + 2}/${maxRetries + 1})...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  return buildFallbackAdAnalysis();
 }
 
 function parseAdAnalysis(raw: string): AdAnalysisResult {

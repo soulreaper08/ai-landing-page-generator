@@ -33,12 +33,36 @@ export function ImageUploadZone({ onImageSelect, previewUrl, disabled }: ImageUp
     };
   }, [previewUrl]);
 
-  const readFileAsBase64 = (file: File): Promise<string> => {
+  const MAX_IMAGE_SIZE = 800; // Max dimension for compression
+  const JPEG_QUALITY = 0.8;
+
+  const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        // Scale down if larger than max
+        if (width > MAX_IMAGE_SIZE || height > MAX_IMAGE_SIZE) {
+          if (width > height) {
+            height = Math.round((height / width) * MAX_IMAGE_SIZE);
+            width = MAX_IMAGE_SIZE;
+          } else {
+            width = Math.round((width / height) * MAX_IMAGE_SIZE);
+            height = MAX_IMAGE_SIZE;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('Canvas context failed')); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', JPEG_QUALITY));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+      img.src = url;
     });
   };
 
@@ -66,7 +90,7 @@ export function ImageUploadZone({ onImageSelect, previewUrl, disabled }: ImageUp
       const file = files[0];
       if (file.type.startsWith('image/')) {
         const url = URL.createObjectURL(file);
-        readFileAsBase64(file).then((base64) => onImageSelect(file, url, base64)).catch(() => onImageSelect(file, url));
+        compressImage(file).then((base64) => onImageSelect(file, url, base64)).catch(() => onImageSelect(file, url));
       }
     }
   }, [disabled, onImageSelect]);
@@ -77,7 +101,7 @@ export function ImageUploadZone({ onImageSelect, previewUrl, disabled }: ImageUp
       const file = files[0];
       if (file.type.startsWith('image/')) {
         const url = URL.createObjectURL(file);
-        readFileAsBase64(file).then((base64) => onImageSelect(file, url, base64)).catch(() => onImageSelect(file, url));
+        compressImage(file).then((base64) => onImageSelect(file, url, base64)).catch(() => onImageSelect(file, url));
       }
     }
   }, [onImageSelect]);
@@ -98,7 +122,7 @@ export function ImageUploadZone({ onImageSelect, previewUrl, disabled }: ImageUp
         const file = items[i].getAsFile();
         if (file) {
           const url = URL.createObjectURL(file);
-          readFileAsBase64(file).then((base64) => onImageSelect(file, url, base64)).catch(() => onImageSelect(file, url));
+          compressImage(file).then((base64) => onImageSelect(file, url, base64)).catch(() => onImageSelect(file, url));
           break;
         }
       }
