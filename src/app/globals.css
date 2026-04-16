@@ -527,3 +527,54 @@ section {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Active navigation link */
+.nav-link-active {
+  color: oklch(0.35 0.1 293);
+  position: relative;
+}
+
+.nav-link-active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: oklch(0.541 0.281 293.009);
+  border-radius: 1px;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}
+
+/* Card shine effect */
+.card-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-shine::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    to bottom right,
+    transparent 40%,
+    oklch(1 0 0 / 0.03) 45%,
+    transparent 55%
+  );
+  transform: rotate(30deg);
+  transition: transform 0.6s ease;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.card-shine:hover::before {
+  transform: rotate(30deg) translate(40%, 40%);
+}

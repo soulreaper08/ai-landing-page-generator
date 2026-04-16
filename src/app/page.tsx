@@ -42,6 +42,11 @@ import {
   Mail,
   ExternalLink,
   Keyboard,
+  Code2,
+  Twitter,
+  Github,
+  Linkedin,
+  Youtube,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
@@ -130,6 +135,11 @@ const stats = [
   { value: '< 10s', label: 'Avg. Generation Time', icon: Clock },
 ];
 
+const brandLogos = [
+  'Shopify', 'WordPress', 'Webflow', 'HubSpot', 'Unbounce', 'Framer',
+  'Vercel', 'Notion', 'Figma', 'Stripe', 'Linear', 'Supabase',
+];
+
 const demoSamples = [
   {
     title: 'SaaS Product',
@@ -159,6 +169,8 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [testimonialIndex, setTestimonialIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [showBefore, setShowBefore] = useState(true);
   const { theme, setTheme } = useTheme();
 
   const { scrollYProgress } = useScroll();
@@ -384,7 +396,7 @@ export default function Home() {
               {/* Hero Section */}
               <section className="relative overflow-hidden">
                 {/* Background decoration */}
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute inset-0 overflow-hidden pointer-events-none noise-overlay gradient-mesh">
                   <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-float" />
                   <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-violet-400/5 rounded-full blur-3xl animate-float-delayed" />
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-gradient-to-r from-primary/3 to-violet-400/3 rounded-full blur-3xl animate-float-slow" />
@@ -557,7 +569,7 @@ export default function Home() {
               </section>
 
               {/* Trusted By Stats */}
-              <section className="py-16 border-y border-border/40 bg-muted/20">
+              <section className="py-16 bg-gradient-to-b from-transparent via-primary/5 to-transparent">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="text-center mb-10">
                     <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
@@ -574,6 +586,215 @@ export default function Home() {
                       />
                     ))}
                   </div>
+                </div>
+              </section>
+
+              {/* See It In Action — Before/After Demo */}
+              <section className="py-20 sm:py-28 bg-muted/20 relative overflow-hidden">
+                <div className="absolute inset-0 dot-pattern opacity-15 pointer-events-none" />
+                <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    className="text-center mb-14"
+                  >
+                    <Badge variant="secondary" className="mb-4 text-xs px-3 py-1">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      See It In Action
+                    </Badge>
+                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+                      This is what Troopod does
+                    </h2>
+                    <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+                      Watch your generic landing page transform into a high-converting, personalized experience that matches your ad creative.
+                    </p>
+                  </motion.div>
+
+                  {/* Mobile Toggle Buttons */}
+                  <div className="flex md:hidden items-center justify-center gap-2 mb-8">
+                    <Button
+                      variant={showBefore ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setShowBefore(true)}
+                      className={cn(
+                        'rounded-lg font-medium transition-all',
+                        showBefore ? 'bg-muted text-foreground' : ''
+                      )}
+                    >
+                      <X className="h-3.5 w-3.5 mr-1.5" />
+                      Before
+                    </Button>
+                    <Button
+                      variant={!showBefore ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setShowBefore(false)}
+                      className={cn(
+                        'rounded-lg font-medium transition-all',
+                        !showBefore ? 'bg-gradient-to-r from-primary to-violet-500 text-white' : ''
+                      )}
+                    >
+                      <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                      After
+                    </Button>
+                  </div>
+
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={showBefore ? 'before' : 'after'}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.35 }}
+                    >
+                      <div className={cn('grid gap-6', 'md:grid-cols-2')}>
+                        {/* ===== BEFORE Card ===== */}
+                        <div className={cn(!showBefore && 'hidden md:block')}>
+                          <Card className="overflow-hidden border border-border/60 shadow-lg relative">
+                            <Badge className="absolute top-3 left-3 z-10 bg-muted text-muted-foreground border border-border/60 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5">
+                              Before
+                            </Badge>
+                            {/* Mock browser bar */}
+                            <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/60 border-b border-border/40">
+                              <div className="flex gap-1.5">
+                                <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/20" />
+                                <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/20" />
+                                <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/20" />
+                              </div>
+                              <div className="flex-1 flex items-center justify-center">
+                                <div className="bg-background/80 rounded-md px-3 py-1 text-[10px] text-muted-foreground/60 border border-border/30 w-48 text-center">
+                                  acmecorp.com
+                                </div>
+                              </div>
+                            </div>
+                            {/* Mock landing page content — plain / dull */}
+                            <div className="bg-gray-50 dark:bg-gray-950 p-6 sm:p-8 space-y-5 min-h-[340px]">
+                              {/* Header */}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-lg bg-gray-300 dark:bg-gray-700" />
+                                  <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">Acme Corp</span>
+                                </div>
+                                <div className="flex gap-3">
+                                  <div className="w-12 h-2 rounded-full bg-gray-200 dark:bg-gray-800" />
+                                  <div className="w-12 h-2 rounded-full bg-gray-200 dark:bg-gray-800" />
+                                  <div className="w-12 h-2 rounded-full bg-gray-200 dark:bg-gray-800" />
+                                </div>
+                              </div>
+                              {/* Hero area */}
+                              <div className="text-center space-y-3 pt-4">
+                                <h3 className="text-xl sm:text-2xl font-bold text-gray-600 dark:text-gray-400">
+                                  Welcome to our website
+                                </h3>
+                                <p className="text-sm text-gray-400 dark:text-gray-500 max-w-xs mx-auto leading-relaxed">
+                                  We offer a variety of solutions for your business needs. Contact us to learn more about our services and offerings.
+                                </p>
+                                <button className="inline-flex items-center px-5 py-2.5 rounded-lg bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-sm font-medium cursor-default">
+                                  Learn More
+                                </button>
+                              </div>
+                              {/* Content blocks */}
+                              <div className="grid grid-cols-3 gap-3 pt-2">
+                                {[1, 2, 3].map((n) => (
+                                  <div key={n} className="rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-3 space-y-2">
+                                    <div className="w-full h-10 rounded-md bg-gray-200 dark:bg-gray-800" />
+                                    <div className="w-3/4 h-2 rounded-full bg-gray-200 dark:bg-gray-800" />
+                                    <div className="w-1/2 h-2 rounded-full bg-gray-200 dark:bg-gray-800" />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </Card>
+                        </div>
+
+                        {/* ===== AFTER Card ===== */}
+                        <div className={cn(showBefore && 'hidden md:block')}>
+                          <Card className="overflow-hidden border border-primary/20 shadow-xl shadow-primary/10 relative">
+                            <Badge className="absolute top-3 left-3 z-10 bg-gradient-to-r from-primary to-violet-500 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 border-0">
+                              After — Personalized by Troopod
+                            </Badge>
+                            {/* Mock browser bar */}
+                            <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary/10 to-violet-500/10 border-b border-primary/20">
+                              <div className="flex gap-1.5">
+                                <div className="w-2.5 h-2.5 rounded-full bg-primary/30" />
+                                <div className="w-2.5 h-2.5 rounded-full bg-violet-400/30" />
+                                <div className="w-2.5 h-2.5 rounded-full bg-purple-400/30" />
+                              </div>
+                              <div className="flex-1 flex items-center justify-center">
+                                <div className="bg-white/90 dark:bg-gray-900/80 rounded-md px-3 py-1 text-[10px] text-primary font-medium border border-primary/20 w-48 text-center">
+                                  acmecorp.com
+                                </div>
+                              </div>
+                            </div>
+                            {/* Mock landing page content — vibrant / premium */}
+                            <div className="relative bg-gradient-to-br from-primary via-violet-600 to-purple-700 p-6 sm:p-8 space-y-5 min-h-[340px] overflow-hidden">
+                              {/* Background decorative elements */}
+                              <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-2xl" />
+                              <div className="absolute bottom-0 left-0 w-32 h-32 bg-violet-300/10 rounded-full blur-2xl" />
+
+                              {/* Header */}
+                              <div className="relative flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                                    <Rocket className="h-4 w-4 text-white" />
+                                  </div>
+                                  <span className="text-sm font-semibold text-white/90">Acme Corp</span>
+                                </div>
+                                <div className="flex gap-3">
+                                  <div className="w-12 h-2 rounded-full bg-white/20" />
+                                  <div className="w-12 h-2 rounded-full bg-white/20" />
+                                  <div className="w-12 h-2 rounded-full bg-white/20" />
+                                </div>
+                              </div>
+                              {/* Hero area */}
+                              <div className="relative text-center space-y-3 pt-4">
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm text-white/80 text-xs font-medium mb-2">
+                                  <Sparkles className="h-3 w-3" />
+                                  AI-Powered
+                                </div>
+                                <h3 className="text-xl sm:text-2xl font-bold text-white leading-tight">
+                                  Transform Your Workflow{' '}
+                                  <span className="text-violet-200">with AI</span>
+                                </h3>
+                                <p className="text-sm text-white/70 max-w-xs mx-auto leading-relaxed">
+                                  Automate repetitive tasks, boost productivity, and unlock insights that drive real business growth.
+                                </p>
+                                <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white text-primary text-sm font-semibold shadow-lg shadow-black/20 hover:shadow-xl transition-shadow cursor-default">
+                                  Start Free Trial
+                                  <ArrowRight className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                              {/* Trust badges */}
+                              <div className="relative flex items-center justify-center gap-4 pt-2">
+                                {[
+                                  { icon: <Shield className="h-3.5 w-3.5" />, label: 'Secure' },
+                                  { icon: <Star className="h-3.5 w-3.5" />, label: '4.9 Rating' },
+                                  { icon: <Users className="h-3.5 w-3.5" />, label: '10k+ Users' },
+                                ].map((badge) => (
+                                  <div key={badge.label} className="flex items-center gap-1.5 text-white/60 text-xs">
+                                    {badge.icon}
+                                    {badge.label}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </Card>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
+
+                  {/* Bottom callout */}
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.3 }}
+                    className="text-center text-sm text-muted-foreground mt-8"
+                  >
+                    <ArrowRight className="h-3.5 w-3.5 inline-block mr-1 text-primary" />
+                    Upload your ad creative above to see this magic on your own landing pages
+                  </motion.p>
                 </div>
               </section>
 
@@ -857,6 +1078,36 @@ export default function Home() {
                     </p>
                   </motion.div>
 
+                  {/* Billing Toggle */}
+                  <div className="flex items-center justify-center gap-3 mb-10">
+                    <span className={cn('text-sm font-medium transition-colors', billingCycle === 'monthly' ? 'text-foreground' : 'text-muted-foreground')}>Monthly</span>
+                    <button
+                      onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annual' : 'monthly')}
+                      className={cn(
+                        'relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                        billingCycle === 'annual' ? 'bg-primary' : 'bg-muted'
+                      )}
+                      aria-label="Toggle billing cycle"
+                    >
+                      <span
+                        className={cn(
+                          'inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-300',
+                          billingCycle === 'annual' ? 'translate-x-6' : 'translate-x-1'
+                        )}
+                      />
+                    </button>
+                    <span className={cn('text-sm font-medium transition-colors', billingCycle === 'annual' ? 'text-foreground' : 'text-muted-foreground')}>Annual</span>
+                    {billingCycle === 'annual' && (
+                      <motion.span
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-500/10 dark:text-green-400 px-2 py-0.5 rounded-full"
+                      >
+                        Save 20%
+                      </motion.span>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-start">
                     {pricingPlans.map((plan, index) => (
                       <motion.div
@@ -879,7 +1130,12 @@ export default function Home() {
                             <CardTitle className="text-lg">{plan.name}</CardTitle>
                             <p className="text-sm text-muted-foreground">{plan.description}</p>
                             <div className="mt-4">
-                              <span className="text-4xl font-extrabold">{plan.price}</span>
+                              {billingCycle === 'annual' && plan.name === 'Pro' && (
+                                <span className="text-lg text-muted-foreground line-through mr-2">$29</span>
+                              )}
+                              <span className="text-4xl font-extrabold">
+                                {billingCycle === 'annual' && plan.name === 'Pro' ? '$23' : plan.price}
+                              </span>
                               <span className="text-muted-foreground text-sm">{plan.period}</span>
                             </div>
                           </CardHeader>
@@ -920,7 +1176,7 @@ export default function Home() {
                     viewport={{ once: true }}
                   >
                     <Card className="bg-gradient-to-br from-primary via-violet-600 to-purple-600 text-white overflow-hidden relative">
-                      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.15),transparent_50%)]" />
+                      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.15),transparent_50%)] noise-overlay" />
                       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(255,255,255,0.1),transparent_50%)]" />
                       <CardContent className="relative p-8 sm:p-12 text-center">
                         <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto mb-6">
@@ -958,8 +1214,8 @@ export default function Home() {
                 </div>
               </section>
 
-              {/* Integrations / Trusted By Logos */}
-              <section className="py-16 border-t border-border/40">
+              {/* Logo Marquee Section */}
+              <section className="py-16 border-t border-border/40 overflow-hidden">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                   <motion.div
                     initial={{ opacity: 0, y: 15 }}
@@ -971,21 +1227,22 @@ export default function Home() {
                       Integrates with your favorite tools
                     </p>
                   </motion.div>
-                  <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
-                    {['Shopify', 'WordPress', 'Webflow', 'HubSpot', 'Unbounce', 'Framer'].map((name, i) => (
-                      <motion.div
-                        key={name}
-                        initial={{ opacity: 0, y: 10 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: i * 0.08 }}
-                        className="flex items-center gap-2 text-muted-foreground/60 hover:text-muted-foreground transition-colors group cursor-default"
+                </div>
+                <div className="relative group">
+                  {/* Fade edges */}
+                  <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+                  <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+                  <div className="animate-marquee group-hover:[animation-play-state:paused] flex items-center gap-8 whitespace-nowrap">
+                    {[...brandLogos, ...brandLogos].map((name, i) => (
+                      <div
+                        key={`${name}-${i}`}
+                        className="flex items-center gap-2.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors cursor-default shrink-0"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                        <div className="w-8 h-8 rounded-lg bg-muted/80 flex items-center justify-center">
+                          <Code2 className="h-4 w-4 text-muted-foreground/60" />
                         </div>
                         <span className="text-sm font-semibold tracking-tight">{name}</span>
-                      </motion.div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -1090,7 +1347,25 @@ export default function Home() {
             <p className="text-xs text-muted-foreground">
               Built with AI. Designed for marketers.
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
+              {/* Social Media Icons */}
+              <div className="flex items-center gap-1">
+                {[
+                  { icon: Twitter, label: 'Twitter', href: '#' },
+                  { icon: Github, label: 'GitHub', href: '#' },
+                  { icon: Linkedin, label: 'LinkedIn', href: '#' },
+                  { icon: Youtube, label: 'YouTube', href: '#' },
+                ].map((social) => (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    aria-label={social.label}
+                    className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-all duration-200"
+                  >
+                    <social.icon className="h-4 w-4" />
+                  </a>
+                ))}
+              </div>
               <Badge variant="secondary" className="text-[10px] px-2 py-0.5 gap-1">
                 <Sparkles className="h-2.5 w-2.5 text-primary" />
                 v1.0.0
