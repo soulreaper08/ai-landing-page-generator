@@ -33,22 +33,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Simulate processing with delays for each step
-    const steps = [
-      { name: 'analyzing', duration: 1500 },
-      { name: 'scraping', duration: 2000 },
-      { name: 'finding_gaps', duration: 1200 },
-      { name: 'generating', duration: 2500 },
-    ];
-
     // In a real implementation, this would:
     // 1. Use VLM to analyze the ad creative image
     // 2. Scrape the landing page content
     // 3. Use LLM to compare ad messaging with page content
     // 4. Generate personalized enhancements
 
-    // Simulate total processing time
-    await new Promise((resolve) => setTimeout(resolve, 7200));
+    // Simulate processing time
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     const results = {
       qualityScore: 92,

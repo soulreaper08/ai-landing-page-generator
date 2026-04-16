@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ImagePlus, X, Upload, FileImage } from 'lucide-react';
@@ -15,6 +15,23 @@ interface ImageUploadZoneProps {
 export function ImageUploadZone({ onImageSelect, previewUrl, disabled }: ImageUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevPreviewUrl = useRef<string | null>(null);
+
+  // Use effect to revoke old blob URLs when previewUrl changes
+  useEffect(() => {
+    if (prevPreviewUrl.current && prevPreviewUrl.current !== previewUrl) {
+      URL.revokeObjectURL(prevPreviewUrl.current);
+    }
+    prevPreviewUrl.current = previewUrl;
+
+    return () => {
+      // Cleanup on unmount
+      if (prevPreviewUrl.current) {
+        URL.revokeObjectURL(prevPreviewUrl.current);
+        prevPreviewUrl.current = null;
+      }
+    };
+  }, [previewUrl]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
