@@ -130,6 +130,24 @@ const stats = [
   { value: '< 10s', label: 'Avg. Generation Time', icon: Clock },
 ];
 
+const demoSamples = [
+  {
+    title: 'SaaS Product',
+    imageUrl: '/demo/demo-saas-ad.png',
+    url: 'https://linear.app',
+  },
+  {
+    title: 'E-commerce Sale',
+    imageUrl: '/demo/demo-ecommerce-ad.png',
+    url: 'https://shopify.com',
+  },
+  {
+    title: 'Fitness App',
+    imageUrl: '/demo/demo-fitness-ad.png',
+    url: 'https://cal.com',
+  },
+];
+
 export default function Home() {
   const [appState, setAppState] = useState<AppState>('input');
   const [currentStep, setCurrentStep] = useState(1);
@@ -167,6 +185,14 @@ export default function Home() {
   const handleUrlChange = useCallback((url: string, isValid: boolean) => {
     setPageUrl(url);
     setIsUrlValid(isValid);
+  }, []);
+
+  const handleTryDemo = useCallback((imageUrl: string, url: string) => {
+    setAdImageUrl(imageUrl);
+    setPreviewUrl(imageUrl);
+    setPageUrl(url);
+    setIsUrlValid(true);
+    toast.success('Demo loaded! Click Generate to see it in action.');
   }, []);
 
   const canGenerate = adImageUrl !== null && isUrlValid;
@@ -482,6 +508,49 @@ export default function Home() {
                             ? 'Now upload an ad creative image'
                             : 'Now enter a valid landing page URL'}
                       </motion.p>
+                    )}
+
+                    {!adImageUrl && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.6 }}
+                        className="mt-8"
+                      >
+                        <p className="text-center text-xs font-medium text-muted-foreground mb-4">
+                          Or try a demo sample
+                        </p>
+                        <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto">
+                          {demoSamples.map((demo) => (
+                            <Card
+                              key={demo.title}
+                              className="cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group overflow-hidden border border-border/60"
+                              onClick={() => handleTryDemo(demo.imageUrl, demo.url)}
+                            >
+                              <CardContent className="p-0">
+                                <div className="relative aspect-[4/3] overflow-hidden">
+                                  <img
+                                    src={demo.imageUrl}
+                                    alt={demo.title}
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                  <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                    <Badge className="bg-white/90 text-background hover:bg-white text-[10px] px-2 py-0.5">
+                                      <Zap className="h-2.5 w-2.5 mr-1" />
+                                      Try it
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <div className="p-2.5">
+                                  <p className="text-xs font-medium text-center truncate">{demo.title}</p>
+                                  <p className="text-[10px] text-muted-foreground text-center truncate">{demo.url}</p>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </motion.div>
                     )}
                   </motion.div>
                 </motion.div>
