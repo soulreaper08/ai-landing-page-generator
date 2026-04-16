@@ -30,3 +30,16 @@ model Post {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model Generation {
+  id              String   @id @default(cuid())
+  pageUrl         String
+  adImagePreview  String?
+  qualityScore    Int      @default(0)
+  totalChanges    Int      @default(0)
+  htmlCode        String
+  originalHtml    String?
+  aiExplanation   String?
+  changes         String
+  createdAt       DateTime @default(now())
+}

@@ -1335,3 +1335,119 @@ html {
 .ba-label-after {
   pointer-events: none;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   CODE VIEWER CUSTOM SCROLLBAR
+   ════════════════════════════════════════════════════════════════ */
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: oklch(0.13 0.01 293);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: oklch(0.35 0.03 293);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.45 0.05 293);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ENHANCED HERO UPLOAD ZONE
+   ════════════════════════════════════════════════════════════════ */
+
+/* Animated dashed border for upload zone */
+@keyframes border-dance {
+  0% { background-position: 0 0, 100% 0, 100% 100%, 0 100%; }
+  100% { background-position: 100% 0, 100% 100%, 0 100%, 0 0; }
+}
+
+/* Magnetic hover effect for generate button */
+@keyframes magnetic-pull {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.magnetic-hover:hover {
+  animation: magnetic-pull 0.6s ease-in-out;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SMOOTH PAGE SECTION REVEAL
+   ════════════════════════════════════════════════════════════════ */
+
+@keyframes section-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.section-reveal {
+  animation: section-reveal 0.8s ease-out forwards;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   STATS COUNTER GLOW
+   ════════════════════════════════════════════════════════════════ */
+
+.stat-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 0%, oklch(0.606 0.25 292.717 / 0.06), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.stat-card:hover::before {
+  opacity: 1;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RESULT TOOLBAR GLOW
+   ════════════════════════════════════════════════════════════════ */
+
+@keyframes toolbar-shine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.result-toolbar-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.result-toolbar-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.04), transparent);
+  animation: toolbar-shine 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.dark .result-toolbar-shine::after {
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.02), transparent);
+}

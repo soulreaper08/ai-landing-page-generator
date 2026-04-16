@@ -16,6 +16,7 @@ import { BackToTop } from '@/components/back-to-top';
 import { ScrollProgress } from '@/components/scroll-progress';
 import { AnimatedCounter } from '@/components/animated-counter';
 import { GenerationProgressBar } from '@/components/generation-progress-bar';
+import { CodeViewer } from '@/components/code-viewer';
 import {
   Rocket,
   Sparkles,
@@ -157,21 +158,20 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [testimonialIndex, setTestimonialIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
-  const mountedRef = useRef<boolean | null>(null);
-  if (mountedRef.current === null) {
-    mountedRef.current = false;
-    // Schedule mount for after hydration
-    queueMicrotask(() => setMounted(true));
-  }
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [generationResult, setGenerationResult] = useState<StitchGenerationResult | null>(null);
   const [animatedScore, setAnimatedScore] = useState(0);
 
-  const [viewMode, setViewMode] = useState<'comparison' | 'preview'>('preview');
+  const [viewMode, setViewMode] = useState<'comparison' | 'preview' | 'code'>('preview');
   const { theme, setTheme } = useTheme();
   const generateRef = useRef<HTMLDivElement>(null);
   const uploadRef = useRef<HTMLDivElement>(null);
+
+  // Hydration mount detection
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Auto-rotate testimonials
   useEffect(() => {
@@ -241,6 +241,7 @@ export default function Home() {
 
       if (data.success && data.result) {
         setGenerationResult(data.result);
+        // Save to localStorage
         const history = JSON.parse(localStorage.getItem('troopod-history') || '[]');
         history.unshift({
           id: Date.now(),
@@ -252,6 +253,21 @@ export default function Home() {
         });
         if (history.length > 20) history.pop();
         localStorage.setItem('troopod-history', JSON.stringify(history));
+        // Save to database (fire-and-forget)
+        fetch('/api/history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pageUrl,
+            adImagePreview: adImageUrl || null,
+            qualityScore: data.result.qualityScore || 0,
+            totalChanges: data.result.totalChanges || 0,
+            htmlCode: data.result.htmlCode || '',
+            originalHtml: data.result.originalHtml || null,
+            aiExplanation: data.result.aiExplanation || null,
+            changes: data.result.changes || [],
+          }),
+        }).catch(() => { /* DB save is non-critical */ });
         setAppState('results');
         toast.success('Personalization complete!');
       } else {
@@ -821,7 +837,7 @@ export default function Home() {
           {appState === 'results' && generationResult && (
             <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="w-full">
               {/* Top bar with back + score badge */}
-              <div className="sticky top-16 z-40 bg-background/80 backdrop-blur-xl border-b border-border/40">
+              <div className="sticky top-16 z-40 bg-background/80 backdrop-blur-xl border-b border-border/40 result-toolbar-shine">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14">
                   <Button variant="ghost" onClick={handleReset} className="gap-2 text-sm">
                     <ArrowLeftRight className="h-4 w-4 rotate-180" />
@@ -852,6 +868,9 @@ export default function Home() {
                       </Button>
                       <Button variant="ghost" size="icon" className={cn('h-7 w-7 rounded-md', viewMode === 'comparison' && 'bg-primary text-primary-foreground')} onClick={() => setViewMode('comparison')} title="Before/After">
                         <ArrowLeftRight className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className={cn('h-7 w-7 rounded-md', viewMode === 'code' && 'bg-primary text-primary-foreground')} onClick={() => setViewMode('code')} title="View Code">
+                        <Code2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </div>
@@ -905,6 +924,10 @@ export default function Home() {
                     generatedHtml={generationResult.htmlCode}
                     className="border-0 rounded-none"
                   />
+                ) : viewMode === 'code' && generationResult.htmlCode ? (
+                  <div className="max-w-6xl mx-auto p-4 sm:p-6">
+                    <CodeViewer code={generationResult.htmlCode} fileName="landing-page.html" />
+                  </div>
                 ) : null}
               </motion.div>
 
