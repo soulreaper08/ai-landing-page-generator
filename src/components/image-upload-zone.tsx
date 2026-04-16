@@ -7,7 +7,7 @@ import { ImagePlus, X, Upload, FileImage } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ImageUploadZoneProps {
-  onImageSelect: (file: File | null, previewUrl: string | null) => void;
+  onImageSelect: (file: File | null, previewUrl: string | null, base64DataUrl?: string | null) => void;
   previewUrl: string | null;
   disabled?: boolean;
 }
@@ -33,6 +33,15 @@ export function ImageUploadZone({ onImageSelect, previewUrl, disabled }: ImageUp
     };
   }, [previewUrl]);
 
+  const readFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+n      reader.readAsDataURL(file);
+    });
+  };
+
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -56,8 +65,7 @@ export function ImageUploadZone({ onImageSelect, previewUrl, disabled }: ImageUp
     if (files && files.length > 0) {
       const file = files[0];
       if (file.type.startsWith('image/')) {
-        const url = URL.createObjectURL(file);
-        onImageSelect(file, url);
+        readFileAsBase64(file).then((base64) => onImageSelect(file, url, base64)).catch(() => onImageSelect(file, url));
       }
     }
   }, [disabled, onImageSelect]);
@@ -68,7 +76,7 @@ export function ImageUploadZone({ onImageSelect, previewUrl, disabled }: ImageUp
       const file = files[0];
       if (file.type.startsWith('image/')) {
         const url = URL.createObjectURL(file);
-        onImageSelect(file, url);
+        readFileAsBase64(file).then((base64) => onImageSelect(file, url, base64)).catch(() => onImageSelect(file, url));
       }
     }
   }, [onImageSelect]);
@@ -89,7 +97,7 @@ export function ImageUploadZone({ onImageSelect, previewUrl, disabled }: ImageUp
         const file = items[i].getAsFile();
         if (file) {
           const url = URL.createObjectURL(file);
-          onImageSelect(file, url);
+          readFileAsBase64(file).then((base64) => onImageSelect(file, url, base64)).catch(() => onImageSelect(file, url));
           break;
         }
       }

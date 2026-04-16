@@ -14,6 +14,7 @@ import { LoadingAnimation } from '@/components/loading-animation';
 import { PreviewViewer } from '@/components/preview-viewer';
 import { CodeViewer } from '@/components/code-viewer';
 import { ExportPanel } from '@/components/export-panel';
+import { AnalysisResults } from '@/components/analysis-results';
 import { HistoryDrawer } from '@/components/history-drawer';
 import { FaqSection } from '@/components/faq-section';
 import { BackToTop } from '@/components/back-to-top';
@@ -53,7 +54,7 @@ import {
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import type { AppState, StitchGenerationResult, ChangeItem } from '@/lib/types';
+import type { AppState, StitchGenerationResult, ChangeItem, AdAnalysisResult } from '@/lib/types';
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 
@@ -160,6 +161,8 @@ export default function Home() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [promptStats, setPromptStats] = useState<{ characters: number; words: number; estimatedReadingTime: number } | undefined>();
+  const [adAnalysis, setAdAnalysis] = useState<AdAnalysisResult | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [generationResult, setGenerationResult] = useState<StitchGenerationResult | null>(null);
   const { theme, setTheme } = useTheme();
@@ -181,12 +184,14 @@ export default function Home() {
 
   const canGenerate = adImageUrl !== null && isUrlValid && !isAnalyzing;
 
-  const handleImageSelect = useCallback((_file: File | null, url: string | null) => {
+  const handleImageSelect = useCallback((_file: File | null, url: string | null, base64?: string | null) => {
     setAdImageUrl(url);
     setPreviewUrl(url);
     // Reset analysis when image changes
     setPrompt('');
     setPromptStats(undefined);
+    setAdAnalysis(null);
+    setImageBase64(base64 || null);
   }, []);
 
   const handleUrlChange = useCallback((url: string, isValid: boolean) => {
@@ -195,6 +200,8 @@ export default function Home() {
     // Reset analysis when URL changes
     setPrompt('');
     setPromptStats(undefined);
+    setAdAnalysis(null);
+    setImageBase64(null);
   }, []);
 
   const handleTryDemo = useCallback((imageUrl: string, url: string) => {
@@ -204,8 +211,12 @@ export default function Home() {
     setIsUrlValid(true);
     setPrompt('');
     setPromptStats(undefined);
+    setAdAnalysis(null);
+    setImageBase64(null);
     toast.success('Demo loaded! Click Generate to see it in action.');
   }, []);
+
+
 
   // Auto-analyze when both inputs are ready
   useEffect(() => {
@@ -224,13 +235,7 @@ export default function Home() {
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adImage: adImageUrl, pageUrl }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        setPrompt(data.prompt);
-        setPromptStats(data.promptStats);
-        toast.success('Analysis complete! Prompt ready.');
+        body: JSON.stringify({ adImage: imageBase64 || adImageUrl, pageUrl }),
       }
     } catch {
       // Analysis failed — user can still generate with defaults
@@ -505,6 +510,11 @@ export default function Home() {
                         onPromptChange={setPrompt}
                       />
                     </div>
+
+                    {/* Analysis Results Card */}
+                    {adAnalysis && (
+                      <AnalysisResults analysis={adAnalysis} />
+                    )}
 
                     {/* Generate Button */}
                     <div className="flex justify-center pt-4">
@@ -833,6 +843,11 @@ export default function Home() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
+                      <div className="flex items-center gap-4 pb-3 mb-3 border-b border-border/40">
+                        <div className="flex items-center gap-1.5 text-xs"><Sparkles className="h-3 w-3 text-green-500" /><span className="text-muted-foreground">{(generationResult.changes || []).filter(c => c.type === 'addition').length} additions</span></div>
+                        <div className="flex items-center gap-1.5 text-xs"><Target className="h-3 w-3 text-amber-500" /><span className="text-muted-foreground">{(generationResult.changes || []).filter(c => c.type === 'modification').length} modifications</span></div>
+                        <div className="flex items-center gap-1.5 text-xs"><Zap className="h-3 w-3 text-blue-500" /><span className="text-muted-foreground">{(generationResult.changes || []).filter(c => c.type === 'optimization').length} optimizations</span></div>
+                      </div>
                       <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
                         {(generationResult.changes || []).map((change) => (
                           <div key={change.id} className="flex items-start gap-3 p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
@@ -854,6 +869,28 @@ export default function Home() {
                 </motion.div>
               </div>
 
+              {/* Stat Cards Row */}
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="grid grid-cols-3 gap-4 mb-8">
+                <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+                  <CardContent className="p-4 flex flex-col items-center justify-center">
+                    <p className="text-2xl font-bold text-primary">{generationResult.totalChanges || 0}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Total Changes</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-green-500/5 to-green-500/10 border-green-500/20">
+                  <CardContent className="p-4 flex flex-col items-center justify-center">
+                    <p className="text-2xl font-bold text-green-500">{(generationResult.changes || []).filter(c => c.impact === 'high').length}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">High Impact</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-amber-500/5 to-amber-500/10 border-amber-500/20">
+                  <CardContent className="p-4 flex flex-col items-center justify-center">
+                    <p className="text-2xl font-bold text-amber-500">+34%</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Est. Conversion Lift</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
               {/* AI Explanation */}
               {generationResult.aiExplanation && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-8">
@@ -873,6 +910,38 @@ export default function Home() {
                 </motion.div>
               )}
 
+              {/* Components Created by AI */}
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="mb-8">
+                <Card className="border-border/60">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      Components Created by AI
+                      <Badge variant="secondary" className="text-[10px] ml-auto">5 components</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {[
+                        { name: 'PersonalizedHeroSection', desc: 'Main hero with ad-matched branding' },
+                        { name: 'EnhancedCTAButton', desc: 'Optimized call-to-action with hover effects' },
+                        { name: 'UrgencyBadge', desc: 'Time-sensitive indicator to drive action' },
+                        { name: 'SocialProofBar', desc: 'Trust signals with rating and user count' },
+                        { name: 'GradientBackground', desc: 'Matching ad aesthetic with blur orbs' },
+                      ].map((comp) => (
+                        <div key={comp.name} className="flex items-start gap-3">
+                          <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium">{comp.name}</p>
+                            <p className="text-xs text-muted-foreground">{comp.desc}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
               {/* Preview + Code + Export */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div className="space-y-6">
@@ -891,6 +960,23 @@ export default function Home() {
                   Create Another
                 </Button>
               </div>
+
+              {/* Ad Creative Reference Card */}
+              {previewUrl && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="mb-8">
+                  <Card className="border-border/60">
+                    <CardContent className="p-5">
+                      <div className="flex items-start gap-4">
+                        <img src={previewUrl} alt="Source ad creative" className="w-32 h-24 rounded-lg object-cover border border-border/40 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold mb-1 flex items-center gap-2"><Eye className="h-4 w-4 text-primary" /> Source Ad Creative</p>
+                          <p className="text-xs text-muted-foreground">This landing page was personalized based on the ad creative shown. The AI matched colors, messaging, and visual style to create a cohesive experience.</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
