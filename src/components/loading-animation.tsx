@@ -9,21 +9,21 @@ interface LoadingAnimationProps {
 }
 
 const steps = [
-  { label: 'Analyzing ad creative', icon: 'image' },
-  { label: 'Scraping landing page', icon: 'globe' },
-  { label: 'Building AI prompt', icon: 'file' },
-  { label: 'Sending to Google Stitch', icon: 'send' },
-  { label: 'Generating personalized UI', icon: 'sparkles' },
-  { label: 'Fetching final code', icon: 'code' },
+  { label: 'Analyzing your ad creative with AI...', icon: 'image' },
+  { label: 'Scanning the landing page structure...', icon: 'globe' },
+  { label: 'Extracting colors, messaging, and branding...', icon: 'file' },
+  { label: 'Building personalized page design...', icon: 'sparkles' },
+  { label: 'Generating production-ready HTML...', icon: 'code' },
+  { label: 'Finalizing your personalized page...', icon: 'check' },
 ];
 
 const tips = [
-  'Google Stitch uses Gemini 2.5 to generate production-ready UI code from natural language.',
   'Matching your landing page to your ad creative can boost conversions by up to 34%.',
   'Color consistency between ads and landing pages builds trust and reduces bounce rates.',
   'A strong headline match between ad and page increases conversion by 20-30%.',
   'Social proof elements on landing pages can increase conversions by 15-25%.',
   'Urgency indicators like countdown timers can boost click-through by 8-12%.',
+  'Personalized landing pages have 2-3x higher engagement than generic ones.',
 ];
 
 export function LoadingAnimation({ currentStep }: LoadingAnimationProps) {
@@ -59,7 +59,7 @@ export function LoadingAnimation({ currentStep }: LoadingAnimationProps) {
           transition={{ delay: 0.3 }}
           className="text-muted-foreground mb-8"
         >
-          Google Stitch is generating your custom UI...
+          Our AI is crafting your page...
         </motion.p>
 
         {/* Progress Steps */}

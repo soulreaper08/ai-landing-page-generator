@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "1) Yes, the headline 'Personalize Landing Pages in Seconds' is visible.  \n2) Partially visible: The first step (\"Upload Your Ad Creative\") of a 2-step input area is shown, but the second step (URL input) is not fully visible in the screenshot.  \n3) No, the 'Generate Personalized Page' button is not visible.  \n4) No, there is no text mentioning 'Stitch'.  \n5) Rating: 6 (the headline and first input step are clear, but the full 2-step area and button are not visible, and 'Stitch' is absent).",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1776360862,
+  "id": "2026041701341751f528a902f947f2",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "2026041701341751f528a902f947f2",
+  "usage": {
+    "completion_tokens": 131,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1053,
+    "prompt_tokens_details": {
+      "cached_tokens": 4
+    },
+    "total_tokens": 1184
+  }
+}

@@ -1168,3 +1168,68 @@ html {
   transition: height 0.3s ease-out;
   border-radius: 2px 2px 0 0;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   BEFORE/AFTER COMPARISON SLIDER
+   ════════════════════════════════════════════════════════════════ */
+
+.ba-comparison-container {
+  position: relative;
+  overflow: hidden;
+  cursor: col-resize;
+  user-select: none;
+  background: #1a1a2e;
+  border-radius: 0 0 0.75rem 0.75rem;
+}
+
+.ba-slider-line {
+  width: 3px;
+  background: white;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.ba-slider-line-inner {
+  position: absolute;
+  inset: 0;
+  background: white;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+}
+
+.ba-slider-handle {
+  pointer-events: none;
+}
+
+.ba-slider-handle-inner {
+  width: 36px;
+  height: 36px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25), 0 0 0 3px rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ba-comparison-container:hover .ba-slider-handle-inner,
+.ba-comparison-container:active .ba-slider-handle-inner {
+  transform: scale(1.1);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.35), 0 0 0 4px rgba(255, 255, 255, 0.4);
+}
+
+.ba-label {
+  z-index: 20;
+  pointer-events: none;
+}
+
+.ba-label-before {
+  pointer-events: none;
+}
+
+.ba-label-after {
+  pointer-events: none;
+}

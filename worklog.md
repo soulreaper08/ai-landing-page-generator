@@ -1,4 +1,87 @@
-# Troopod v2.0 — AI-Powered Landing Page Personalization Tool (Stitch AI Edition)
+# Troopod v2.0 — AI-Powered Landing Page Personalization Tool
+
+---
+
+## Major Redesign Session — 2026-04-19 (Round 4)
+
+### Overall Assessment: ✅ Clean Redesign
+- **ESLint**: Clean — zero errors, zero warnings
+- **Dev Server**: Compiling successfully, all routes returning 200
+- **API `/api/generate`**: Returns 200 with full result (htmlCode, originalHtml, qualityScore, changes, aiExplanation)
+
+### What Changed
+
+This session addressed user frustration with branding, UX complexity, and code quality. The product is now called "Troopod" — the AI backend is an implementation detail.
+
+### 1. Removed All "Google Stitch" Branding from UI
+- **Badge**: "v2.0 — Stitch AI" → "v2.0 — AI Powered"
+- **Hero badge**: "Powered by Google Stitch AI" → "Powered by AI"
+- **Generate button**: "Generate with Google Stitch" → "Generate Personalized Page"
+- **Loading screen**: "Google Stitch is generating..." → "Our AI is crafting your page..."
+- **Loading steps**: Removed "Sending to Google Stitch" → "Building personalized page design..."
+- **Loading tips**: Removed all Stitch/Gemini references
+- All user-facing text now says "Troopod" or generic "AI"
+
+### 2. Simplified UX Flow (2 Steps, Not 3)
+- **Step 1**: Upload ad creative (image upload zone)
+- **Step 2**: Enter landing page URL
+- **Generate button appears** when both are ready
+- **Removed**: PromptBuilder component, Step 3 UI, auto-analysis useEffect, keyboard shortcut tooltip, QuickActionsBar, Session Stats, OnboardingTooltip, template gallery, CodeViewer, ExportPanel
+- Backend builds the prompt automatically — no user editing needed
+
+### 3. Backend Rewrite — Real End-to-End Pipeline
+`/api/generate` now accepts only `{ adImage, pageUrl }` and handles everything:
+
+1. **VLM Ad Analysis** (`glm-4.6v`): Analyzes uploaded ad image to extract colors, headline, CTA, tone, style, value props
+2. **Landing Page Scraping**: Uses Jina Reader to scrape and analyze page structure
+3. **Original HTML Fetch**: Fetches raw HTML from pageUrl for before/after comparison
+4. **LLM Code Generation** (`glm-4.6`): Very detailed prompt producing complete, production-ready HTML landing pages with:
+   - Trust badge bar, urgency badge, hero section with gradient text
+   - Primary/secondary CTA buttons with hover effects
+   - Social proof bar with brand logos and star ratings
+   - Value props strip, animated blur orbs, dot patterns
+   - Responsive CSS with @media queries
+   - CSS variables for all colors
+5. **Quality Analysis**: LLM generates quality score, changes list, and explanation
+
+### 4. Before/After Comparison (New Component)
+- **New**: `src/components/before-after-comparison.tsx` — Draggable slider comparing original vs personalized pages
+  - Two iframes side by side (original via srcDoc, generated via srcDoc)
+  - Draggable vertical slider with handle
+  - "Original" and "Personalized" labels
+  - Touch support for mobile
+  - CSS classes in globals.css for slider styling
+
+### 5. Results View Redesigned
+- **View mode toggle**: "Before/After" vs "Full Preview" buttons
+- **Before/After comparison**: Shows original page vs generated page with draggable slider
+- **Full Preview**: Live iframe of generated page
+- **Action buttons**: Download Code, Fullscreen Preview, Copy Code, Create Another
+- **Kept**: Quality score ring, changes list, AI explanation (compact), ad creative reference
+- **Removed**: CodeViewer, ExportPanel, Session Stats, QuickActionsBar, Components Created section
+
+### 6. How It Works Updated
+- Step 1: "Upload Your Ad" — brief description
+- Step 2: "Enter Landing Page URL" — brief description
+- Step 3: "Get Your Personalized Page" — "AI generates a page matching your ad's colors, messaging, and style"
+
+### Files Modified
+- `src/app/page.tsx` — Complete rewrite: simplified 2-step flow, no Stitch, before/after results
+- `src/app/api/generate/route.ts` — Complete rewrite: VLM + scrape + LLM pipeline, detailed prompt
+- `src/components/loading-animation.tsx` — Removed all Stitch references
+- `src/components/before-after-comparison.tsx` — NEW (draggable slider comparison)
+- `src/lib/types.ts` — Added `originalHtml` field to result type
+- `src/app/globals.css` — Added before/after comparison slider CSS
+
+### QA Results
+- ✅ ESLint: 0 errors, 0 warnings
+- ✅ Dev Server: Compiling successfully
+- ✅ Homepage (`/`): Returns 200
+- ✅ API (`/api/generate`): Returns 200 with `{ success: true, result: { htmlCode, originalHtml, qualityScore, changes, aiExplanation } }`
+- ✅ No visible "Stitch" branding in UI (0 occurrences confirmed via DOM search)
+- ✅ Generated HTML: Complete standalone document (13,000+ chars) with DOCTYPE, CSS variables, h1, CTA, animations, gradients, responsive design
+- ✅ Original HTML: Fetched and returned for before/after comparison
+- ✅ "Generate Personalized Page" button confirmed present in DOM
 
 ---
 

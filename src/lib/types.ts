@@ -42,12 +42,13 @@ export interface PageAnalysisResult {
   estimatedConversionElements: number;
 }
 
-/** Result from the Stitch generation endpoint */
+/** Result from the generation endpoint */
 export interface StitchGenerationResult {
   success: boolean;
   projectId?: string;
   screenId?: string;
   htmlCode?: string;
+  originalHtml?: string;
   reactCode?: string;
   cssCode?: string;
   qualityScore?: number;
