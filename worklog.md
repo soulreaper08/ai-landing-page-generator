@@ -2,6 +2,82 @@
 
 ---
 
+## Google Stitch API Integration — 2026-04-20 (Task 7)
+
+### Overall Assessment: ✅ Working
+- **ESLint**: Zero errors, zero warnings
+- **Dev Server**: Compiling successfully, all routes returning 200
+- **API `/api/generate`**: Returns 200 with Stitch-generated HTML (~15K chars)
+- **Cron Job**: Created (ID: 100175, every 15 minutes)
+
+### What Changed
+
+Replaced the LLM-based HTML generation (glm-4.6) with **Google Stitch API** for producing landing pages. The pipeline now uses:
+
+1. **VLM Ad Analysis** (glm-4.6v): Extracts design style (colors, headline, CTA, tone) from uploaded ad image
+2. **Jina Page Scraping**: Scrapes the target landing page URL for content context
+3. **Google Stitch Generation** (GEMINI_3_FLASH): Sends comprehensive prompt with design style + website context to generate actual landing page HTML
+4. **LLM Quality Analysis** (glm-4.6): Generates quality score, changes list, and explanation
+
+### Key Technical Decisions
+
+1. **Direct MCP HTTP client instead of SDK**: The `@google/stitch-sdk` package's internal transport had timeout issues in Next.js's server environment. Implemented a direct JSON-RPC HTTP client (`stitchMcpCall()`) that calls `https://stitch.googleapis.com/mcp` with `X-Goog-Api-Key` header.
+
+2. **GEMINI_3_FLASH model**: Required for actual screen generation. Without `modelId: 'GEMINI_3_FLASH'`, Stitch only returns a design system without any screen HTML.
+
+3. **Bare project ID**: Stitch's `create_project` returns names like `"projects/12345"`, but `generate_screen_from_text` needs just the bare ID `"12345"`. Code strips the `"projects/"` prefix.
+
+4. **Screen extraction from outputComponents**: Stitch returns an array of output components:
+   - `[0]` = design system (colors, fonts, theme)
+   - `[1]` = actual screen design with `design.screens[0]`
+   - `[2-5]` = text suggestions
+   
+   The code iterates through components to find the one with `design.screens`.
+
+### Stitch API Configuration
+- **API Endpoint**: `https://stitch.googleapis.com/mcp` (MCP over HTTP)
+- **API Key**: Stored in `.env` as `STITCH_API_KEY`
+- **Authentication**: `X-Goog-Api-Key` HTTP header
+- **Protocol**: JSON-RPC 2.0 (`tools/call` method)
+- **Generation time**: ~2-3 minutes total (project create + screen generate + HTML download)
+
+### Files Modified
+- `.env` — Added `STITCH_API_KEY`
+- `src/app/api/generate/route.ts` — Complete rewrite with Stitch MCP integration
+  - Removed `@google/stitch-sdk` import (was causing timeouts in Next.js)
+  - Added `stitchMcpCall()` direct MCP HTTP client
+  - Removed mock HTML fallback on pipeline error (now returns actual error to user)
+  - Removed `extractHtmlFromResponse()` and `buildMockHtml()` (no longer needed)
+  - Kept VLM analysis, Jina scraping, and quality analysis (unchanged)
+- `src/app/page.tsx` — Enhanced error handling:
+  - Added empty HTML validation (rejects pages < 50 chars)
+  - Error toasts now include error description and 8s duration
+  - Console errors logged for debugging
+- `package.json` — Added `@google/stitch-sdk` (used for testing), `zod` (dependency)
+
+### QA Results
+- ✅ ESLint: 0 errors, 0 warnings
+- ✅ Dev Server: Compiling successfully
+- ✅ API `/api/generate`: Returns 200 with Stitch HTML (~15K chars, DOCTYPE, full document)
+- ✅ Pipeline: VLM → Scrape → Stitch → Analysis → 200 (2.3 min total)
+- ✅ Error handling: Returns meaningful error messages instead of mock fallbacks
+
+### Known Issues
+1. **Generation time ~2-3 minutes** — Stitch takes longer than the previous LLM approach. Could benefit from streaming progress updates.
+2. **API key limits** — Stitch free tier has 350 generations/month. The `generate_screen_from_text` tool may return only a design system (no screen) when the limit is reached.
+3. **Design-only responses** — If Stitch returns only `outputComponents[0]` (design system) without `[1]` (screen), the user gets a clear error message suggesting the API limit may be reached.
+
+### Priority Recommendations for Next Phase
+1. Add SSE streaming endpoint for real-time progress updates during Stitch generation
+2. Consider caching Stitch project IDs to reuse across generations (reduce project creation overhead)
+3. Add Stitch API usage counter/metering
+4. Enhance prompt to include image as base64 if Stitch adds image input support
+5. Add WebSocket real-time progress updates
+6. Performance: lazy-load below-fold sections
+7. Mobile responsive QA
+
+---
+
 ## Cron QA + Feature Enhancement Session — 2026-04-20 (Task 4)
 
 ### Overall Assessment: ✅ Stable

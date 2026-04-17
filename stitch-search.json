@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://stitch.withgoogle.com",
+    "name": "Stitch - Design with AI",
+    "snippet": "Stitch generates UIs for mobile and web applications, making design ideation fast and easy. Missing: endpoint | Show results with: endpoint",
+    "host_name": "stitch.withgoogle.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://apify.com/juzken/stitch-design-generator/api",
+    "name": "Google Stitch AI - Design Generator API - Apify",
+    "snippet": "Below, you can find a list of relevant HTTP API endpoints for calling the Google Stitch AI - Design Generator Actor. For this, you'll need ...",
+    "host_name": "apify.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://uxplanet.org/google-stitch-for-ui-design-544cf8b42d52",
+    "name": "Google Stitch for UI Design - UX Planet",
+    "snippet": "Medium: App or Web design. Based on my experience, Google Stitch works best for mobile app design, and is less effective for web. AI Model.",
+    "host_name": "uxplanet.org",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.stitchdata.com/docs/developers/stitch-connect/api",
+    "name": "Stitch Connect API Reference | Stitch Documentation",
+    "snippet": "This API is a RESTful, resource-oriented API that allows you to programmatically provision Stitch accounts, create and modify data sources, and configure ...",
+    "host_name": "www.stitchdata.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://uxpilot.ai/blogs/google-stitch-ai",
+    "name": "Google Stitch AI Walkthrough: Comparison, Features, Alternatives",
+    "snippet": "Google Labs released Stitch with a bold promise: Help you turn a prompt or sketch into a working UI mockup, then export it as frontend code.",
+    "host_name": "uxpilot.ai",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=oG_YBZKzQok",
+    "name": "Google Stitch - Generate AI UI Designs with ZERO Code ! - YouTube",
+    "snippet": "Google's new Stitch, the latest AI-powered tool unveiled at Google I/O 2025. Leveraging the capabilities of Gemini 2.5 Pro, Stitch enables ... Missing: endpoint | Show results with: endpoint",
+    "host_name": "www.youtube.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://developers.googleblog.com/stitch-a-new-way-to-design-uis",
+    "name": "From idea to app: Introducing Stitch, a new way to design UIs",
+    "snippet": "Explore Stitch, a new Google Labs experiment that uses AI to generate UI designs and frontend code from text or image inputs in minutes.",
+    "host_name": "developers.googleblog.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://almcorp.com/blog/google-stitch-complete-guide-ai-ui-design-tool-2026",
+    "name": "Google Stitch: Complete Guide to AI UI Design Tool (2026) - ALM Corp",
+    "snippet": "Master Google Stitch, the free AI-powered UI design tool by Google Labs. Learn how to generate app interfaces, export to Figma, ...",
+    "host_name": "almcorp.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://medium.com/design-bootcamp/stitch-by-google-from-prompt-to-prototype-8d1286c7e91c",
+    "name": "Stitch by Google: From Prompt to Prototype | by Yashita Sharma",
+    "snippet": "A generative AI interface builder that allows you to go from a prompt or a rough sketch to a functioning prototype within minutes.",
+    "host_name": "medium.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.mindstudio.ai/blog/what-is-google-stitch-ai-design-tool",
+    "name": "What Is Google Stitch? The AI Design Tool That Competes with Figma",
+    "snippet": "Google Stitch is a free AI-powered design tool that generates full design systems, interactive prototypes, and exports to AI Studio.",
+    "host_name": "www.mindstudio.ai",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

@@ -240,6 +240,11 @@ export default function Home() {
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       if (data.success && data.result) {
+        if (!data.result.htmlCode || data.result.htmlCode.length < 50) {
+          toast.error('Generated page was empty. Please try again with a different image or URL.');
+          setAppState('input');
+          return;
+        }
         setGenerationResult(data.result);
         // Save to localStorage
         const history = JSON.parse(localStorage.getItem('troopod-history') || '[]');
@@ -269,13 +274,17 @@ export default function Home() {
           }),
         }).catch(() => { /* DB save is non-critical */ });
         setAppState('results');
-        toast.success('Personalization complete!');
+        toast.success('Landing page generated successfully!');
       } else {
-        toast.error(data.error || 'Generation failed');
+        const errorMsg = data.error || 'Generation failed';
+        toast.error(errorMsg, { duration: 8000, description: 'Check the console for more details.' });
+        console.error('[Troopod] Generation error:', errorMsg);
         setAppState('input');
       }
-    } catch {
-      toast.error('Generation failed. Please try again.');
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Unknown error';
+      toast.error('Generation failed. Please try again.', { duration: 8000, description: errMsg.substring(0, 100) });
+      console.error('[Troopod] Generation exception:', err);
       setAppState('input');
     }
   }, [canGenerate, adImageUrl, pageUrl, imageBase64]);

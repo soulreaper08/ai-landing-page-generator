@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://stitch.withgoogle.com",
+    "name": "Stitch - Design with AI - Google",
+    "snippet": "Stitch generates UIs for mobile and web applications, making design ideation fast and easy. Missing: curl request",
+    "host_name": "stitch.withgoogle.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://uxplanet.org/google-stitch-for-ui-design-544cf8b42d52",
+    "name": "Google Stitch for UI Design - UX Planet",
+    "snippet": "The first thing you need to do when using Google Stitch is to write a decent prompt. Similar to any other AI tools,. The better you articulate ... Missing: API curl",
+    "host_name": "uxplanet.org",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://apify.com/juzken/stitch-design-generator/api",
+    "name": "Google Stitch AI - Design Generator API - Apify",
+    "snippet": "Generate UI designs from a text prompt using Google Stitch AI. Returns a Stitch project that you can preview, edit, or export to HTML, Figma, ...",
+    "host_name": "apify.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://discuss.ai.google.dev/t/stitch-prompt-guide/83844",
+    "name": "Stitch Prompt Guide - Google AI Developers Forum",
+    "snippet": "This guide provides instructions for crafting effective prompts to design and refine your app with Stitch. Missing: curl | Show results with: curl",
+    "host_name": "discuss.ai.google.dev",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=b0DiJgU6ktU",
+    "name": "Google Stitch Creates INSANE App UI in Minutes (FREE) - YouTube",
+    "snippet": "... Google AI tools to design professional-level app UI in minutes. First, I use Google Stitch to generate clean, modern app designs with AI ... Missing: API curl request",
+    "host_name": "www.youtube.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://blog.google/innovation-and-ai/models-and-research/google-labs/stitch-ai-ui-design",
+    "name": "Introducing “vibe design” with Stitch - Google Blog",
+    "snippet": "Stitch now uses AI to help you create high-fidelity UI designs from natural language. The new AI-native canvas lets you explore ideas, add ... Missing: curl request",
+    "host_name": "blog.google",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.codecademy.com/article/google-stitch-tutorial-ai-powered-ui-design-tool",
+    "name": "Design Mobile App UI with Google Stitch (Step-by-Step Guide)",
+    "snippet": "Explore Google Stitch, an AI tool that turns prompts and wireframes into UI. Complete tutorial with step-by-step project examples. Missing: API curl",
+    "host_name": "www.codecademy.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://designerup.co/blog/google-stitch-first-look",
+    "name": "I Asked Google to Design Me An App UI and It Did - DesignerUp",
+    "snippet": "Stitch is Googles new UI design generator a that promises to turn “ideas into UI designs and front-end code in minutes. Missing: API curl",
+    "host_name": "designerup.co",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://lobehub.com/skills/gabelul-stitch-kit-stitch-setup",
+    "name": "stitch-setup | Skills Marketplace - LobeHub",
+    "snippet": "This skill guides users through setting up the Stitch MCP (remote generation API) and installing the stitch-kit plugin so AI clients can ...",
+    "host_name": "lobehub.com",
+    "rank": 8,
+    "date": "Apr 13, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://medium.com/google-cloud/great-looking-uis-with-google-stitch-and-google-antigravity-88255c97f291",
+    "name": "Great-looking UIs with Google Stitch and Google Antigravity - Medium",
+    "snippet": "Press enter or click to view image in full size. Create API Key in Stitch. Then go ahead and create your API Key. Once the API Key is created ... Missing: curl | Show results with: curl",
+    "host_name": "medium.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

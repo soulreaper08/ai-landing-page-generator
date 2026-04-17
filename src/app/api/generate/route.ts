@@ -2,6 +2,56 @@ import { NextRequest, NextResponse } from 'next/server';
 import ZAI from 'z-ai-web-dev-sdk';
 import type { StitchGenerationResult, ChangeItem, AdAnalysisResult, PageAnalysisResult } from '@/lib/types';
 
+// ─── Direct Stitch MCP Client ────────────────────────────────────────────────
+// We use direct fetch instead of the SDK because the SDK's internal transport
+// has timeout issues in Next.js's server environment.
+
+const STITCH_MCP_URL = 'https://stitch.googleapis.com/mcp';
+
+async function stitchMcpCall(apiKey: string, toolName: string, args: Record<string, unknown>): Promise<any> {
+  const body = JSON.stringify({
+    jsonrpc: '2.0',
+    id: crypto.randomUUID(),
+    method: 'tools/call',
+    params: {
+      name: toolName,
+      arguments: args,
+    },
+  });
+
+  const res = await fetch(STITCH_MCP_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'Accept': 'application/json, text/event-stream',
+    },
+    body,
+    signal: AbortSignal.timeout(300000), // 5 minute timeout
+  });
+
+  if (!res.ok) {
+    throw new Error(`Stitch MCP HTTP ${res.status}: ${res.statusText}`);
+  }
+
+  const text = await res.text();
+  
+  // Try parsing as JSON-RPC response
+  try {
+    const json = JSON.parse(text);
+    if (json.error) {
+      throw new Error(`Stitch error: ${json.error.message || JSON.stringify(json.error)}`);
+    }
+    return json?.result?.content?.[0]?.text ? JSON.parse(json.result.content[0].text) : json?.result;
+  } catch (e) {
+    if (e instanceof SyntaxError) {
+      // Maybe it's SSE or something else
+      throw new Error(`Unexpected Stitch response: ${text.substring(0, 200)}`);
+    }
+    throw e;
+  }
+}
+
 // POST /api/generate
 // Accepts: { adImage: string (base64), pageUrl: string }
 // Returns: { success: boolean, result: StitchGenerationResult }
@@ -24,7 +74,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[Generate] Starting full pipeline — VLM analysis + page scrape + LLM generation');
+    console.log('[Generate] Starting full pipeline — VLM analysis + page scrape + Stitch generation');
 
     let result: StitchGenerationResult;
 
@@ -32,8 +82,12 @@ export async function POST(request: NextRequest) {
       result = await fullPipeline(adImage, pageUrl);
       console.log('[Generate] Pipeline completed successfully');
     } catch (pipelineError) {
-      console.warn('[Generate] Pipeline failed, falling back to mock:', pipelineError);
-      result = buildMockResult(pageUrl);
+      console.error('[Generate] Pipeline failed:', pipelineError);
+      const errMsg = pipelineError instanceof Error ? pipelineError.message : 'Unknown error';
+      return NextResponse.json(
+        { success: false, error: `Generation failed: ${errMsg}` },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ success: true, result });
@@ -46,7 +100,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ─── Full Pipeline: Analyze → Scrape → Build Prompt → Generate ─────────────────
+// ─── Full Pipeline: Analyze → Scrape → Stitch Generate ─────────────────────────
 
 async function fullPipeline(
   adImage: string,
@@ -54,12 +108,12 @@ async function fullPipeline(
 ): Promise<StitchGenerationResult> {
   const zai = await ZAI.create();
 
-  // Step 1: Analyze ad image via VLM
+  // Step 1: Analyze ad image via VLM (extract design style)
   console.log('[Generate] Step 1: Analyzing ad image via VLM...');
   const adAnalysis = await analyzeAdImageWithRetry(zai, adImage);
   console.log('[Generate] Ad analysis complete:', adAnalysis.headline);
 
-  // Step 2: Scrape landing page
+  // Step 2: Scrape landing page for context
   console.log('[Generate] Step 2: Scraping landing page...');
   const pageAnalysis = await scrapeLandingPage(pageUrl);
   console.log('[Generate] Page analysis complete:', pageAnalysis.title);
@@ -68,21 +122,19 @@ async function fullPipeline(
   console.log('[Generate] Step 3: Fetching original page HTML...');
   const originalHtml = await fetchOriginalHtml(pageUrl);
 
-  // Step 4: Generate the HTML page with a very detailed prompt
-  console.log('[Generate] Step 4: Generating HTML via LLM...');
-  const htmlCode = await generateHtmlPage(zai, adAnalysis, pageAnalysis);
+  // Step 4: Generate the HTML page via Google Stitch
+  console.log('[Generate] Step 4: Generating HTML via Google Stitch...');
+  const stitchResult = await generateViaStitch(adAnalysis, pageAnalysis);
+  const { htmlCode, stitchProjectId, stitchScreenId } = stitchResult;
 
-  // Step 5: Generate analysis/changes
+  // Step 5: Generate analysis/changes using LLM
   console.log('[Generate] Step 5: Generating analysis...');
   const analysis = await generateAnalysis(zai, adAnalysis, pageAnalysis, htmlCode);
 
-  const projectId = `proj_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-  const screenId = `scr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-
   return {
     success: true,
-    projectId,
-    screenId,
+    projectId: stitchProjectId,
+    screenId: stitchScreenId,
     htmlCode,
     originalHtml,
     qualityScore: analysis.qualityScore,
@@ -95,15 +147,12 @@ async function fullPipeline(
 // ─── VLM Ad Image Analysis ────────────────────────────────────────────────────
 
 function cleanBase64Image(dataUrl: string): string {
-  // Remove any whitespace, newlines from base64 data
   let cleaned = dataUrl.replace(/\s+/g, '');
-  // Ensure proper data URL format
   if (cleaned.startsWith('data:image/')) {
     const mimeMatch = cleaned.match(/^data:(image\/\w+);base64,/);
     if (mimeMatch) {
       const mime = mimeMatch[1];
       const base64 = cleaned.substring(mimeMatch[0].length);
-      // Reconstruct clean data URL (ensure JPEG or PNG mime)
       return `data:${mime};base64,${base64}`;
     }
   }
@@ -111,7 +160,6 @@ function cleanBase64Image(dataUrl: string): string {
 }
 
 function isValidAnalysisHeadline(headline: string): boolean {
-  // Reject obviously invalid headlines
   if (!headline || headline.length < 2) return false;
   if (headline.length > 100) return false;
   if (/^Analyze|^Extract|^Please|^Here|^Output/i.test(headline)) return false;
@@ -128,7 +176,6 @@ async function analyzeAdImage(zai: Awaited<ReturnType<typeof ZAI.create>>, image
     return buildFallbackAdAnalysis();
   }
 
-  // Clean the base64 image data
   const cleanImage = cleanBase64Image(imageInput);
   const base64SizeKB = Math.round((cleanImage.length * 3) / 4 / 1024);
   console.log(`[Generate] Image base64 size: ~${base64SizeKB}KB`);
@@ -186,7 +233,6 @@ Respond ONLY with valid JSON in this exact format:
     const raw = response.choices?.[0]?.message?.content ?? '';
     const parsed = parseAdAnalysis(raw);
     
-    // Validate the parsed result - if headline looks invalid, use fallback
     if (!isValidAnalysisHeadline(parsed.headline)) {
       console.warn('[Generate] VLM returned invalid headline, using fallback:', parsed.headline?.substring(0, 50));
       return buildFallbackAdAnalysis();
@@ -199,11 +245,9 @@ Respond ONLY with valid JSON in this exact format:
   }
 }
 
-// Retry wrapper for VLM analysis
 async function analyzeAdImageWithRetry(zai: Awaited<ReturnType<typeof ZAI.create>>, imageInput: string, maxRetries = 2): Promise<AdAnalysisResult> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const result = await analyzeAdImage(zai, imageInput);
-    // If result is valid (not a fallback), return it
     if (isValidAnalysisHeadline(result.headline)) {
       return result;
     }
@@ -345,7 +389,6 @@ async function fetchOriginalHtml(url: string): Promise<string> {
       },
     });
     const html = await res.text();
-    // Truncate to first 8000 chars to avoid huge payloads
     return html.substring(0, 8000);
   } catch {
     console.warn('[Generate] Could not fetch original HTML, using placeholder');
@@ -365,186 +408,152 @@ async function fetchOriginalHtml(url: string): Promise<string> {
   }
 }
 
-// ─── HTML Page Generation via LLM ─────────────────────────────────────────────
+// ─── HTML Generation via Google Stitch (Direct MCP HTTP) ──────────────────────
 
-async function generateHtmlPage(
-  zai: Awaited<ReturnType<typeof ZAI.create>>,
+async function generateViaStitch(
   ad: AdAnalysisResult,
   page: PageAnalysisResult,
-): Promise<string> {
-  const codegenPrompt = `You are an expert front-end developer who creates stunning, production-ready landing pages. Generate a COMPLETE, SELF-CONTAINED HTML landing page.
+): Promise<{ htmlCode: string; stitchProjectId: string; stitchScreenId: string }> {
+  const apiKey = process.env.STITCH_API_KEY;
+  if (!apiKey) {
+    throw new Error('STITCH_API_KEY is not configured. Please set it in your .env file.');
+  }
 
-CRITICAL: Output ONLY the HTML code inside a single \`\`\`html code block. No markdown, no explanation before or after the code block.
+  // Build a comprehensive prompt for Stitch
+  const stitchPrompt = `Design a stunning, high-converting landing page.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFERENCE WEBSITE: ${page.url}
+Please scrape and analyze the website at ${page.url} to understand its structure, content, and purpose, then create a personalized landing page based on it.
 
-## DESIGN SPECIFICATIONS (from the ad creative)
-
+DESIGN STYLE (extracted from ad creative — apply these to the page):
 - Primary Color: ${ad.colors.primary}
-- Secondary Color: ${ad.colors.secondary}
-- Accent Color: ${ad.colors.accent}
+- Secondary Color: ${ad.colors.secondary}  
+- Accent Color (for CTAs/buttons): ${ad.colors.accent}
 - Background Color: ${ad.colors.background}
 - Text Color: ${ad.colors.text}
 - Brand Tone: ${ad.tone}
 - Visual Style: ${ad.style}
 - Emotional Appeal: ${ad.emotionalAppeal}
 
-## CONTENT (from the ad creative)
-
+PAGE CONTENT:
 - Headline: "${ad.headline}"
-- Subheadline: "${ad.subheadline}"
+- Subheadline: "${ad.subheadline || 'Discover how we can help you achieve your goals'}"
 - CTA Button Text: "${ad.ctaText}"
-- Value Props: ${ad.valueProps.join(', ')}
+- Key Value Propositions: ${ad.valueProps.join(', ')}
 
-## CONTEXT
+REQUIREMENTS:
+1. Create a desktop landing page that matches the ad creative's visual style
+2. Use the exact colors specified above as the design system
+3. Include a hero section with the headline, subheadline, and CTA button
+4. Add social proof elements (trust badges, testimonials area, or client logos)
+5. Include a features/benefits section
+6. Add urgency elements if appropriate for the "${ad.tone}" tone
+7. Make it fully responsive
+8. Include subtle animations (hover effects, transitions)
+9. The design should look like a premium SaaS product page
+10. Use the website at ${page.url} as inspiration for content structure and layout`;
 
-Target Landing Page: ${page.url}
-Page Domain: ${page.domain}
-Page Title: "${page.title}"
+  // Step 1: Create project
+  console.log('[Generate] Stitch: Creating project...');
+  const projectResult = await stitchMcpCall(apiKey, 'create_project', {
+    title: `Troopod — ${page.domain}`,
+  });
+  
+  const rawProjectId = projectResult?.projectId || projectResult?.id || projectResult?.name;
+  const projectId = rawProjectId?.startsWith('projects/') 
+    ? rawProjectId.slice('projects/'.length) 
+    : rawProjectId;
+  
+  if (!projectId) {
+    throw new Error('Failed to create Stitch project: no project ID returned');
+  }
+  console.log('[Generate] Stitch: Project created:', projectId);
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## REQUIRED PAGE STRUCTURE
-
-The page must include ALL of these sections, in this order:
-
-### 1. Top Trust Badge Bar
-- A slim bar at the very top (height ~40px)
-- Background: slightly darker shade of the primary color
-- White text, small caps, centered
-- Text: "✨ Trusted by 10,000+ teams · No credit card required"
-- Font-size: 12px
-
-### 2. Urgency/Announcement Badge
-- Rounded pill badge (border-radius: 9999px)
-- Position: centered, above the headline
-- Background: rgba(251, 191, 36, 0.15)
-- Border: 1px solid ${ad.colors.accent} with 40% opacity
-- Text: "🔥 Limited Offer — Join 2,847 professionals this week"
-- Font-size: 14px, font-weight: 600
-- Subtle pulse animation (scale 1 → 1.03 → 1 over 3s)
-
-### 3. Main Hero Section
-- Full viewport height (min-height: 100vh)
-- Background: gradient from ${ad.colors.primary} to ${ad.colors.secondary} at 135deg
-- Add 2-3 decorative blur orbs (position: absolute, filter: blur(80px), opacity: 0.3) floating behind content with gentle float animation
-- Add a subtle dot-pattern or grid overlay (opacity: 0.15)
-
-#### Headline (h1):
-- Font-size: clamp(2.5rem, 5vw, 4rem)
-- Font-weight: 800
-- Color: ${ad.colors.text}
-- Line-height: 1.1
-- Letter-spacing: -0.02em
-- The key phrase "${ad.headline}" should have a gradient text effect using ${ad.colors.accent}
-- Max-width: 800px, centered
-
-#### Subheadline (p):
-- Font-size: clamp(1rem, 2vw, 1.25rem)
-- Color: rgba(${ad.colors.text}, 0.85)
-- Line-height: 1.7
-- Max-width: 600px, centered
-- Margin-top: 1.5rem
-- Text: "${ad.subheadline}" (or a compelling supporting message)
-
-### 4. CTA Group
-- Flexbox row, centered, gap: 1rem
-- Primary CTA Button:
-  - Background: linear-gradient(135deg, ${ad.colors.accent}, slightly darker shade)
-  - Color: #1a1a2e (dark text)
-  - Padding: 1rem 2.5rem
-  - Border-radius: 0.75rem
-  - Font-weight: 700
-  - Font-size: 1.125rem
-  - Box-shadow: 0 4px 20px ${ad.colors.accent} with 30% opacity
-  - Text: "${ad.ctaText}"
-  - Hover: translateY(-2px), scale(1.02), increased shadow
-  - Transition: all 0.2s ease
-  - Cursor: pointer, border: none
-- Secondary CTA Button:
-  - Background: rgba(255, 255, 255, 0.1)
-  - Border: 1px solid rgba(255, 255, 255, 0.25)
-  - Color: white
-  - Padding: 1rem 2rem
-  - Border-radius: 0.75rem
-  - Backdrop-filter: blur(10px)
-  - Text: "Watch Demo ▶"
-  - Hover: background becomes rgba(255,255,255,0.2)
-
-### 5. Urgency Timer Text
-- Below CTAs, font-size: 0.875rem, opacity: 0.75
-- Text: "⏰ Offer ends in 23:59:42 — No credit card required"
-
-### 6. Social Proof Bar
-- Margin-top: 3rem
-- Background: rgba(255, 255, 255, 0.08)
-- Border: 1px solid rgba(255, 255, 255, 0.1)
-- Border-radius: 1rem
-- Backdrop-filter: blur(20px)
-- Padding: 1.5rem 2rem
-- Inside:
-  - Label: "TRUSTED BY 10,000+ TEAMS WORLDWIDE" (uppercase, letter-spacing: 0.1em, font-size: 0.75rem, opacity: 0.7, margin-bottom: 1rem)
-  - Logo row: 5 brand names (Google, Microsoft, Stripe, Notion, Figma) as simple text with a small colored icon box, flexbox, centered, gap: 2rem, opacity: 0.6
-  - Star rating: 5 gold stars (★), text: "4.9/5 from 2,500+ reviews", centered
-
-### 7. Value Props Strip (below social proof)
-- 3 items in a row, font-size: 0.875rem
-- Each with a ✓ check icon in green
-- Items based on: ${ad.valueProps.join(', ')}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## TECHNICAL REQUIREMENTS
-
-1. ALL CSS must be in a single <style> tag — NO external dependencies, NO CDN links, NO Google Fonts
-2. Font stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif
-3. Must work perfectly inside an iframe (no reliance on parent page styles)
-4. CSS animations required:
-   - @keyframes float: translateY(0) → translateY(-20px) over 6s, ease-in-out, infinite, for blur orbs
-   - @keyframes pulse-badge: scale(1) → scale(1.03) → scale(1) over 3s for urgency badge
-   - @keyframes gradient-shift: background-position 0% → 100% → 0% over 8s for gradient text
-5. Responsive with @media (max-width: 640px):
-   - Stack CTAs vertically (flex-direction: column, full width)
-   - Reduce headline font to 2rem
-   - Reduce padding
-   - Logo row wraps
-6. Use CSS variables at the top of the <style> tag for all colors
-7. Box-sizing: border-box globally (universal selector)
-8. The page must be VISUALLY STUNNING — like a premium SaaS landing page from a top agency
-
-## COLOR SYSTEM (use these CSS variables):
---primary: ${ad.colors.primary};
---secondary: ${ad.colors.secondary};
---accent: ${ad.colors.accent};
---bg: ${ad.colors.background};
---text: ${ad.colors.text};
-
-Remember: Output ONLY the HTML code inside \`\`\`html ... \`\`\` fences. No other text.`;
-
-  const response = await zai.chat.completions.create({
-    model: 'glm-4.6',
-    messages: [
-      {
-        role: 'system',
-        content:
-          'You are an expert front-end developer specializing in high-converting SaaS landing pages. You generate clean, production-ready HTML with inline styles in a <style> tag. Your pages are visually stunning, animated, and fully responsive. Always respond with ONLY the code inside a fenced code block.',
-      },
-      {
-        role: 'user',
-        content: codegenPrompt,
-      },
-    ],
+  // Step 2: Generate screen using GEMINI_3_FLASH
+  console.log('[Generate] Stitch: Generating screen (this takes 30-60s)...');
+  const screenResult = await stitchMcpCall(apiKey, 'generate_screen_from_text', {
+    projectId,
+    prompt: stitchPrompt,
+    deviceType: 'DESKTOP',
+    modelId: 'GEMINI_3_FLASH',
   });
 
-  const rawContent = response.choices?.[0]?.message?.content ?? '';
-  const htmlCode = extractHtmlFromResponse(rawContent);
+  // Step 3: Extract screen data
+  const outputComponents = screenResult?.outputComponents || [];
+  let screenData: any = null;
 
-  if (!htmlCode || htmlCode.length < 100) {
-    console.warn('[Generate] LLM returned insufficient HTML, using mock fallback');
-    return buildMockHtml(page.url);
+  for (const comp of outputComponents) {
+    if (comp?.design?.screens?.length > 0) {
+      screenData = comp.design.screens[0];
+      break;
+    }
   }
 
-  return htmlCode;
+  if (!screenData) {
+    screenData = screenResult?.screens?.[0] || screenResult?.design?.screens?.[0];
+  }
+  
+  const screenId = screenData?.id || screenData?.name || screenData?.screenId;
+  
+  if (!screenId || !screenData) {
+    console.error('[Generate] Stitch: No screen found. Components:', 
+      outputComponents.map((c: any, i: number) => `  [${i}] keys=[${Object.keys(c).join(',')}]`).join('\n'));
+    throw new Error('Stitch generated a design system but no screen. The API may be processing — please try again.');
+  }
+  console.log('[Generate] Stitch: Screen generated:', screenId);
+
+  // Step 4: Get HTML download URL
+  let htmlUrl = screenData?.htmlCode?.downloadUrl;
+  
+  if (!htmlUrl) {
+    console.log('[Generate] Stitch: Fetching HTML via get_screen...');
+    const screenDetail = await stitchMcpCall(apiKey, 'get_screen', {
+      projectId,
+      screenId,
+      name: `projects/${projectId}/screens/${screenId}`,
+    });
+    htmlUrl = screenDetail?.htmlCode?.downloadUrl;
+  }
+
+  if (!htmlUrl) {
+    throw new Error('Stitch generated a screen but could not retrieve the HTML download URL.');
+  }
+  console.log('[Generate] Stitch: HTML URL obtained');
+
+  // Step 5: Download the actual HTML
+  console.log('[Generate] Stitch: Downloading HTML content...');
+  const htmlResponse = await fetch(htmlUrl, {
+    signal: AbortSignal.timeout(30000),
+  });
+  
+  if (!htmlResponse.ok) {
+    throw new Error(`Failed to download HTML from Stitch: HTTP ${htmlResponse.status}`);
+  }
+  
+  let htmlCode = await htmlResponse.text();
+  console.log('[Generate] Stitch: HTML downloaded, length:', htmlCode.length);
+
+  // Ensure it's a valid HTML document
+  if (!htmlCode.includes('<html') && !htmlCode.includes('<!DOCTYPE')) {
+    console.warn('[Generate] Stitch returned non-HTML content, wrapping...');
+    htmlCode = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${ad.headline} — ${page.domain}</title>
+</head>
+<body>
+${htmlCode}
+</body>
+</html>`;
+  }
+
+  return {
+    htmlCode,
+    stitchProjectId: projectId,
+    stitchScreenId: screenId,
+  };
 }
 
 // ─── Analysis Generation ──────────────────────────────────────────────────────
@@ -593,339 +602,9 @@ Respond ONLY with valid JSON in this format:
     return {
       qualityScore: 88,
       changes: buildMockChanges(),
-      explanation: `Generated a personalized landing page matching the "${ad.headline}" ad creative. The page features matching colors, messaging, and conversion elements for improved post-click performance.`,
+      explanation: `Generated a personalized landing page matching the "${ad.headline}" ad creative using Google Stitch. The page features matching colors, messaging, and conversion elements for improved post-click performance.`,
     };
   }
-}
-
-// ─── Mock Fallback Result ────────────────────────────────────────────────────
-
-function buildMockResult(pageUrl: string): StitchGenerationResult {
-  const projectId = `proj_mock_${Date.now()}`;
-  const screenId = `scr_mock_${Date.now()}`;
-  const htmlCode = buildMockHtml(pageUrl);
-  const originalHtml = `<!DOCTYPE html><html><head><title>${pageUrl}</title></head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;color:#666"><p>Original page content could not be loaded</p></body></html>`;
-
-  return {
-    success: true,
-    projectId,
-    screenId,
-    htmlCode,
-    originalHtml,
-    qualityScore: 92,
-    totalChanges: 7,
-    changes: buildMockChanges(),
-    aiExplanation:
-      'AI-generated hero section perfectly matched to your ad creative branding. The personalized landing page features a gradient hero with urgency elements, social proof, and an optimized CTA — designed to maximize post-click conversion rates.',
-  };
-}
-
-// ─── Mock HTML — Production-Ready Hero Section ───────────────────────────────
-
-function buildMockHtml(pageUrl: string): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Personalized Landing Page — Powered by Troopod</title>
-  <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-    :root {
-      --primary: #7c3aed;
-      --secondary: #a78bfa;
-      --accent: #fbbf24;
-      --bg: #0f0a1a;
-      --text: #ffffff;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 50%, #6B21A8 100%);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: var(--text);
-      overflow-x: hidden;
-      position: relative;
-    }
-
-    body::before, body::after {
-      content: '';
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(80px);
-      opacity: 0.3;
-      animation: float 8s ease-in-out infinite;
-    }
-    body::before {
-      width: 400px; height: 400px;
-      background: #a78bfa;
-      top: -100px; left: -100px;
-    }
-    body::after {
-      width: 350px; height: 350px;
-      background: #7c3aed;
-      bottom: -80px; right: -80px;
-      animation-delay: -4s;
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      50% { transform: translate(30px, -30px) scale(1.05); }
-    }
-
-    .hero-container {
-      position: relative;
-      z-index: 1;
-      max-width: 900px;
-      width: 100%;
-      padding: 3rem 2rem;
-      text-align: center;
-    }
-
-    .urgency-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: rgba(251, 191, 36, 0.15);
-      border: 1px solid rgba(251, 191, 36, 0.4);
-      padding: 0.5rem 1.5rem;
-      border-radius: 9999px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      margin-bottom: 2rem;
-      backdrop-filter: blur(10px);
-      animation: pulse-badge 3s ease-in-out infinite;
-      color: #fde68a;
-    }
-    .urgency-badge .dot {
-      width: 8px; height: 8px;
-      background: #fbbf24;
-      border-radius: 50%;
-      animation: blink 1.5s ease-in-out infinite;
-    }
-
-    @keyframes pulse-badge {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.03); }
-    }
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
-
-    h1 {
-      font-size: clamp(2.5rem, 5vw, 3.75rem);
-      font-weight: 800;
-      line-height: 1.1;
-      margin-bottom: 1.5rem;
-      letter-spacing: -0.02em;
-    }
-    .highlight {
-      background: linear-gradient(135deg, #fbbf24, #f59e0b);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .subheadline {
-      font-size: clamp(1rem, 2vw, 1.25rem);
-      line-height: 1.6;
-      opacity: 0.9;
-      margin-bottom: 2.5rem;
-      max-width: 640px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    .cta-group {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-      margin-bottom: 1.5rem;
-    }
-
-    .cta-primary {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: linear-gradient(135deg, #fbbf24, #f59e0b);
-      color: #1a1a2e;
-      padding: 1rem 2.5rem;
-      border-radius: 0.75rem;
-      font-weight: 700;
-      font-size: 1.125rem;
-      text-decoration: none;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-      cursor: pointer;
-      border: none;
-      box-shadow: 0 4px 20px rgba(251, 191, 36, 0.3);
-    }
-    .cta-primary:hover {
-      transform: translateY(-2px) scale(1.02);
-      box-shadow: 0 8px 40px rgba(251, 191, 36, 0.45);
-    }
-
-    .cta-secondary {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      color: #ffffff;
-      padding: 1rem 2rem;
-      border-radius: 0.75rem;
-      font-weight: 600;
-      font-size: 1rem;
-      text-decoration: none;
-      transition: all 0.2s ease;
-      cursor: pointer;
-      backdrop-filter: blur(10px);
-    }
-    .cta-secondary:hover {
-      background: rgba(255, 255, 255, 0.2);
-      transform: translateY(-1px);
-    }
-
-    .urgency-timer {
-      margin-top: 1rem;
-      font-size: 0.875rem;
-      opacity: 0.75;
-    }
-
-    .social-proof {
-      margin-top: 3rem;
-      padding: 1.5rem 2rem;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 1rem;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(20px);
-    }
-    .social-proof-text {
-      font-size: 0.75rem;
-      opacity: 0.7;
-      margin-bottom: 1rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      font-weight: 600;
-    }
-    .logos {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 2rem;
-      flex-wrap: wrap;
-    }
-    .logo-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.875rem;
-      opacity: 0.6;
-    }
-    .logo-icon {
-      width: 20px; height: 20px;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.15);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.75rem;
-    }
-    .stars {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.25rem;
-      margin-top: 1rem;
-      font-size: 1rem;
-    }
-    .star { color: #fbbf24; }
-    .rating-text {
-      margin-left: 0.5rem;
-      font-size: 0.875rem;
-      opacity: 0.7;
-    }
-
-    .value-props {
-      display: flex;
-      justify-content: center;
-      gap: 2rem;
-      margin-top: 2rem;
-      font-size: 0.875rem;
-      flex-wrap: wrap;
-    }
-    .value-prop {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .check-icon { color: #34d399; }
-
-    @media (max-width: 640px) {
-      .hero-container { padding: 2rem 1.25rem; }
-      .cta-group { flex-direction: column; }
-      .cta-primary, .cta-secondary { width: 100%; justify-content: center; }
-      .logos { gap: 1rem; }
-      .value-props { flex-direction: column; align-items: center; gap: 0.75rem; }
-    }
-  </style>
-</head>
-<body>
-  <div class="hero-container">
-    <div class="urgency-badge">
-      <span class="dot"></span>
-      <span>Limited Offer — Join 2,847 professionals this week</span>
-    </div>
-
-    <h1>
-      Transform Your Workflow<br>
-      with <span class="highlight">AI-Powered</span> Automation
-    </h1>
-
-    <p class="subheadline">
-      Stop wasting time on repetitive tasks. Our platform uses cutting-edge AI to
-      streamline your workflow, boost productivity by 10x, and deliver results that
-      speak for themselves.
-    </p>
-
-    <div class="cta-group">
-      <a href="#" class="cta-primary">Start Free Trial <span>→</span></a>
-      <a href="#" class="cta-secondary">Watch Demo ▶</a>
-    </div>
-
-    <p class="urgency-timer">⏰ Offer ends in 23:59:42 — No credit card required</p>
-
-    <div class="social-proof">
-      <p class="social-proof-text">Trusted by 10,000+ Teams Worldwide</p>
-      <div class="logos">
-        <div class="logo-item"><div class="logo-icon">G</div> Google</div>
-        <div class="logo-item"><div class="logo-icon">M</div> Microsoft</div>
-        <div class="logo-item"><div class="logo-icon">S</div> Stripe</div>
-        <div class="logo-item"><div class="logo-icon">N</div> Notion</div>
-        <div class="logo-item"><div class="logo-icon">F</div> Figma</div>
-      </div>
-      <div class="stars">
-        <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
-        <span class="rating-text">4.9/5 from 2,500+ reviews</span>
-      </div>
-    </div>
-
-    <div class="value-props">
-      <div class="value-prop"><span class="check-icon">✓</span> Save time</div>
-      <div class="value-prop"><span class="check-icon">✓</span> Boost productivity</div>
-      <div class="value-prop"><span class="check-icon">✓</span> Easy to use</div>
-    </div>
-  </div>
-  <!-- Enhanced by Troopod AI from: ${pageUrl} -->
-</body>
-</html>`;
 }
 
 // ─── Mock Changes ─────────────────────────────────────────────────────────────
@@ -942,36 +621,7 @@ function buildMockChanges(): ChangeItem[] {
   ];
 }
 
-// ─── Utility Functions ───────────────────────────────────────────────────────
-
-function extractHtmlFromResponse(raw: string): string {
-  // Try ```html ... ``` first
-  let extracted = extractCodeBlock(raw, 'html');
-  if (extracted) return extracted;
-
-  // Try any fenced block
-  const anyBlock = raw.match(/```[\w]*\n([\s\S]*?)```/);
-  if (anyBlock?.[1]) {
-    const content = anyBlock[1].trim();
-    if (content.includes('<!DOCTYPE') || content.includes('<html')) {
-      return content;
-    }
-  }
-
-  // If the raw content itself looks like HTML
-  const trimmed = raw.trim();
-  if (trimmed.includes('<!DOCTYPE') || trimmed.includes('<html')) {
-    return trimmed;
-  }
-
-  return trimmed;
-}
-
-function extractCodeBlock(raw: string, lang: string): string | undefined {
-  const regex = new RegExp(`\`\`\`${lang}\\s*\\n([\\s\\S]*?)\`\`\``, 'i');
-  const match = raw.match(regex);
-  return match?.[1]?.trim();
-}
+// ─── Analysis Parsing ─────────────────────────────────────────────────────────
 
 function parseAnalysisResponse(raw: string): {
   qualityScore: number;
