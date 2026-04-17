@@ -1,11 +1,13 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { Rocket, Check, Loader2, Circle } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Rocket, Check, Loader2, Circle, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LoadingAnimationProps {
   currentStep: number; // 1-6
+  statusMessage?: string; // Real-time status message from SSE
 }
 
 const steps = [
@@ -26,8 +28,39 @@ const tips = [
   'Personalized landing pages have 2-3x higher engagement than generic ones.',
 ];
 
-export function LoadingAnimation({ currentStep }: LoadingAnimationProps) {
+/** Typewriter effect hook for the status message */
+function useTypewriter(text: string, speed = 30) {
+  const [displayed, setDisplayed] = useState('');
+  const indexRef = useRef(0);
+
+  useEffect(() => {
+    if (!text) {
+      setDisplayed('');
+      indexRef.current = 0;
+      return;
+    }
+
+    // Reset and start typing
+    indexRef.current = 0;
+    setDisplayed('');
+
+    const timer = setInterval(() => {
+      indexRef.current += 1;
+      setDisplayed(text.substring(0, indexRef.current));
+      if (indexRef.current >= text.length) {
+        clearInterval(timer);
+      }
+    }, speed);
+
+    return () => clearInterval(timer);
+  }, [text, speed]);
+
+  return displayed;
+}
+
+export function LoadingAnimation({ currentStep, statusMessage }: LoadingAnimationProps) {
   const tip = tips[Math.floor(Date.now() / 8000) % tips.length];
+  const typedStatus = useTypewriter(statusMessage ?? '', 25);
 
   return (
     <div className="fixed inset-0 bg-background/95 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -57,10 +90,34 @@ export function LoadingAnimation({ currentStep }: LoadingAnimationProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="text-muted-foreground mb-8"
+          className="text-muted-foreground mb-6"
         >
           Our AI is crafting your page...
         </motion.p>
+
+        {/* Real-time Status Message */}
+        <AnimatePresence mode="wait">
+          {typedStatus && (
+            <motion.div
+              key={statusMessage}
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="mb-6 px-4 py-3 rounded-xl bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border border-primary/15"
+            >
+              <div className="flex items-center gap-2 justify-start">
+                <Zap className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                <p className="text-sm text-primary font-medium text-left leading-relaxed">
+                  {typedStatus}
+                  {typedStatus.length < (statusMessage?.length ?? 0) && (
+                    <span className="inline-block w-0.5 h-4 bg-primary/80 ml-0.5 animate-pulse" />
+                  )}
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Progress Steps */}
         <motion.div

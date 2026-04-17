@@ -160,6 +160,7 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
+  const [statusMessage, setStatusMessage] = useState<string>('');
   const [generationResult, setGenerationResult] = useState<StitchGenerationResult | null>(null);
   const [animatedScore, setAnimatedScore] = useState(0);
 
@@ -216,48 +217,90 @@ export default function Home() {
 
     setAppState('loading');
     setCurrentStep(1);
+    setStatusMessage('Initializing AI pipeline...');
 
-    // Start the API call immediately — don't fake-animate before it
-    const apiPromise = fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        adImage: imageBase64 || adImageUrl,
-        pageUrl,
-      }),
-    }).then((res) => res.json());
-
-    // Animate steps in parallel with the API call
-    const stepTimings = [2000, 4000, 6000, 12000, 20000, 30000];
-    const stepPromises = stepTimings.map((delay, i) =>
-      new Promise<void>((resolve) => setTimeout(() => { setCurrentStep(i + 1); resolve(); }, delay))
-    );
-
+    // Use SSE streaming for real-time progress updates
     try {
-      const data = await apiPromise;
-      // Make sure we show step 6
-      setCurrentStep(6);
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const response = await fetch('/api/generate/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adImage: imageBase64 || adImageUrl,
+          pageUrl,
+        }),
+      });
 
-      if (data.success && data.result) {
-        if (!data.result.htmlCode || data.result.htmlCode.length < 50) {
+      if (!response.ok || !response.body) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finalData: Record<string, unknown> | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        let currentEventType = '';
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEventType = line.substring(7).trim();
+          } else if (line.startsWith('data: ')) {
+            const jsonStr = line.substring(6);
+            try {
+              const data = JSON.parse(jsonStr);
+
+              if (currentEventType === 'progress' && data.step) {
+                setCurrentStep(data.step);
+                setStatusMessage(data.detail || data.message || '');
+              } else if (currentEventType === 'result') {
+                finalData = data;
+              } else if (currentEventType === 'error') {
+                const errorMsg = data.error || 'Generation failed';
+                toast.error(errorMsg, { duration: 8000, description: 'Check the console for more details.' });
+                console.error('[Troopod] Generation SSE error:', errorMsg);
+                setAppState('input');
+                return;
+              }
+            } catch {
+              // Ignore JSON parse errors for partial chunks
+            }
+            currentEventType = '';
+          }
+        }
+      }
+
+      // Process the final result
+      if (finalData && finalData.success && finalData.result) {
+        const result = finalData.result as StitchGenerationResult;
+        setCurrentStep(6);
+        setStatusMessage('Done! Rendering your page...');
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        if (!result.htmlCode || result.htmlCode.length < 50) {
           toast.error('Generated page was empty. Please try again with a different image or URL.');
           setAppState('input');
           return;
         }
-        setGenerationResult(data.result);
+        setGenerationResult(result);
         // Save to localStorage
-        const history = JSON.parse(localStorage.getItem('troopod-history') || '[]');
-        history.unshift({
+        const localHistory = JSON.parse(localStorage.getItem('troopod-history') || '[]');
+        localHistory.unshift({
           id: Date.now(),
           pageUrl,
           timestamp: new Date().toISOString(),
-          qualityScore: data.result.qualityScore || 92,
-          totalChanges: data.result.totalChanges || 6,
+          qualityScore: result.qualityScore || 92,
+          totalChanges: result.totalChanges || 6,
           adImagePreview: adImageUrl,
         });
-        if (history.length > 20) history.pop();
-        localStorage.setItem('troopod-history', JSON.stringify(history));
+        if (localHistory.length > 20) localHistory.pop();
+        localStorage.setItem('troopod-history', JSON.stringify(localHistory));
         // Save to database (fire-and-forget)
         fetch('/api/history', {
           method: 'POST',
@@ -265,18 +308,18 @@ export default function Home() {
           body: JSON.stringify({
             pageUrl,
             adImagePreview: adImageUrl || null,
-            qualityScore: data.result.qualityScore || 0,
-            totalChanges: data.result.totalChanges || 0,
-            htmlCode: data.result.htmlCode || '',
-            originalHtml: data.result.originalHtml || null,
-            aiExplanation: data.result.aiExplanation || null,
-            changes: data.result.changes || [],
+            qualityScore: result.qualityScore || 0,
+            totalChanges: result.totalChanges || 0,
+            htmlCode: result.htmlCode || '',
+            originalHtml: result.originalHtml || null,
+            aiExplanation: result.aiExplanation || null,
+            changes: result.changes || [],
           }),
         }).catch(() => { /* DB save is non-critical */ });
         setAppState('results');
         toast.success('Landing page generated successfully!');
       } else {
-        const errorMsg = data.error || 'Generation failed';
+        const errorMsg = (finalData?.error as string) || 'Generation failed';
         toast.error(errorMsg, { duration: 8000, description: 'Check the console for more details.' });
         console.error('[Troopod] Generation error:', errorMsg);
         setAppState('input');
@@ -330,6 +373,43 @@ export default function Home() {
     toast.info('URL loaded from history');
   }, []);
 
+  // Preview a history item by loading the full generation result from DB
+  const handlePreviewHistory = useCallback(async (item: { id: number; pageUrl: string }) => {
+    setHistoryOpen(false);
+    toast.info('Loading generation from history...');
+    try {
+      const res = await fetch(`/api/history/${item.id}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data?.htmlCode) {
+          const dbItem = json.data;
+          const result: StitchGenerationResult = {
+            success: true,
+            projectId: dbItem.id,
+            htmlCode: dbItem.htmlCode,
+            originalHtml: dbItem.originalHtml || undefined,
+            qualityScore: dbItem.qualityScore || 0,
+            totalChanges: dbItem.totalChanges || 0,
+            changes: typeof dbItem.changes === 'string' ? JSON.parse(dbItem.changes) : (dbItem.changes || []),
+            aiExplanation: dbItem.aiExplanation || undefined,
+          };
+          setPageUrl(dbItem.pageUrl);
+          setIsUrlValid(true);
+          setGenerationResult(result);
+          setAppState('results');
+          toast.success('Loaded from history!');
+          return;
+        }
+      }
+    } catch {
+      // Fall through to URL-only loading
+    }
+    // Fallback: just load the URL
+    setPageUrl(item.pageUrl);
+    setIsUrlValid(true);
+    toast.info('URL loaded from history');
+  }, []);
+
   const handleDownloadCode = useCallback(() => {
     if (!generationResult?.htmlCode) return;
     const blob = new Blob([generationResult.htmlCode], { type: 'text/html' });
@@ -373,10 +453,10 @@ export default function Home() {
           </div>
 
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
-            <a href="#features" className="hover:text-foreground transition-colors font-medium">Features</a>
-            <a href="#how-it-works" className="hover:text-foreground transition-colors font-medium">How it Works</a>
-            <a href="#testimonials" className="hover:text-foreground transition-colors font-medium">Testimonials</a>
-            <a href="#pricing" className="hover:text-foreground transition-colors font-medium">Pricing</a>
+            <a href="#features" className="nav-link-animated hover:text-foreground transition-colors font-medium">Features</a>
+            <a href="#how-it-works" className="nav-link-animated hover:text-foreground transition-colors font-medium">How it Works</a>
+            <a href="#testimonials" className="nav-link-animated hover:text-foreground transition-colors font-medium">Testimonials</a>
+            <a href="#pricing" className="nav-link-animated hover:text-foreground transition-colors font-medium">Pricing</a>
           </nav>
 
           <div className="flex items-center gap-1.5">
@@ -407,16 +487,16 @@ export default function Home() {
         </AnimatePresence>
       </motion.header>
 
-      <HistoryDrawer open={historyOpen} onOpenChange={setHistoryOpen} onLoadHistory={handleLoadHistory} />
+      <HistoryDrawer open={historyOpen} onOpenChange={setHistoryOpen} onLoadHistory={handleLoadHistory} onPreviewHistory={handlePreviewHistory} />
 
       {/* Generation Progress Bar */}
       <AnimatePresence>
-        {appState === 'loading' && <GenerationProgressBar currentStep={currentStep} />}
+        {appState === 'loading' && <GenerationProgressBar currentStep={currentStep} statusMessage={statusMessage} />}
       </AnimatePresence>
 
       {/* Loading Overlay */}
       <AnimatePresence>
-        {appState === 'loading' && <LoadingAnimation currentStep={currentStep} />}
+        {appState === 'loading' && <LoadingAnimation currentStep={currentStep} statusMessage={statusMessage} />}
       </AnimatePresence>
 
       <main className="flex-1">
@@ -460,8 +540,8 @@ export default function Home() {
 
                 <motion.div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-24 pb-12">
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex justify-center mb-8">
-                    <Badge variant="secondary" className="gap-1.5 px-4 py-1.5 text-xs font-medium cursor-pointer hover:bg-secondary/80 transition-colors shadow-sm">
-                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <Badge variant="secondary" className="hero-badge-vivid gap-1.5 px-4 py-1.5 text-xs font-semibold cursor-pointer hover:bg-secondary/80 transition-colors text-primary">
+                      <Sparkles className="h-3.5 w-3.5" />
                       Powered by AI — Turn ads into landing pages
                     </Badge>
                   </motion.div>
@@ -474,7 +554,7 @@ export default function Home() {
                       </span>
                     </h1>
                     <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                      Upload your ad creative, enter a landing page URL, and let AI bridge the gap between your ads and your pages for maximum conversions.
+                      Upload your ad creative, enter a landing page URL, and let <span className="text-primary font-semibold">AI bridge the gap</span> between your ads and your pages for <span className="text-primary font-semibold">maximum conversions</span>.
                     </p>
                   </motion.div>
 
@@ -515,7 +595,7 @@ export default function Home() {
                           )}
                         >
                           <Rocket className="h-5 w-5" />
-                          Generate Personalized Page
+                          <span className={cn(canGenerate && 'cta-text-pulse')}>Generate Personalized Page</span>
                           {canGenerate && <ArrowRight className="h-4 w-4" />}
                         </Button>
                       </motion.div>
@@ -599,8 +679,8 @@ export default function Home() {
               <AnimatedSection direction="fade">
               <section className="py-16 bg-gradient-to-b from-transparent via-primary/5 to-transparent">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <div className="text-center mb-10">
-                    <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Trusted by growth-focused teams worldwide</p>
+                  <div className="text-center mb-10 stats-decorator">
+                    <p className="text-sm font-medium uppercase tracking-wider stats-header-shimmer">Trusted by growth-focused teams worldwide</p>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                     {stats.map((stat) => (
@@ -636,7 +716,8 @@ export default function Home() {
                         viewport={{ once: true }}
                         transition={{ delay: i * 0.1 }}
                       >
-                        <Card className="feature-card glass-card h-full border-border/60 hover:shadow-lg transition-all duration-300">
+                        <Card className="feature-card glass-card feature-card-enhanced h-full border-border/60 hover:shadow-lg transition-all duration-300 relative overflow-hidden">
+                          <span className="feature-card-number">0{i + 1}</span>
                           <CardContent className="p-6">
                             <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center mb-4', feature.iconBg)}>
                               {feature.icon}
@@ -691,7 +772,9 @@ export default function Home() {
                         {/* Step connector for desktop */}
                         {i < howItWorks.length - 1 && (
                           <div className="hidden md:flex absolute top-1/2 -right-4 transform -translate-y-1/2 z-10">
-                            <ArrowRight className="h-6 w-6 text-primary/40" />
+                            <div className="step-connector-enhanced">
+                              <ArrowRight className="h-5 w-5 connector-arrow" />
+                            </div>
                           </div>
                         )}
                       </motion.div>

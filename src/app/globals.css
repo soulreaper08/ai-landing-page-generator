@@ -1337,6 +1337,280 @@ html {
 }
 
 /* ════════════════════════════════════════════════════════════════
+   TASK 3-a: VLM QA POLISH — NEW STYLING ENHANCEMENTS
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Hero badge vivid gradient border ── */
+.hero-badge-vivid {
+  position: relative;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.hero-badge-vivid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, oklch(0.606 0.25 292.717), oklch(0.702 0.183 293.541), oklch(0.491 0.27 292.581));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ── 2. Navigation link animated underline ── */
+.nav-link-animated {
+  position: relative;
+  text-decoration: none;
+}
+
+.nav-link-animated::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, oklch(0.606 0.25 292.717), oklch(0.702 0.183 293.541));
+  border-radius: 1px;
+  transition: width 0.3s ease, left 0.3s ease;
+}
+
+.nav-link-animated:hover::after {
+  width: 100%;
+  left: 0;
+}
+
+/* ── 4. Stats header shimmer ── */
+@keyframes stats-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.stats-header-shimmer {
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    oklch(0.5 0.03 293) 0%,
+    oklch(0.541 0.281 293.009 / 0.6) 40%,
+    oklch(0.5 0.03 293) 60%,
+    oklch(0.541 0.281 293.009 / 0.6) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: stats-shimmer 4s linear infinite;
+}
+
+/* Decorative sparkle for stats section */
+.stats-decorator {
+  position: relative;
+}
+
+.stats-decorator::before,
+.stats-decorator::after {
+  content: '✦';
+  position: absolute;
+  font-size: 10px;
+  opacity: 0.3;
+  color: oklch(0.606 0.25 292.717);
+  animation: float-gentle 3s ease-in-out infinite;
+}
+
+.stats-decorator::before {
+  top: -8px;
+  left: -16px;
+  animation-delay: 0s;
+}
+
+.stats-decorator::after {
+  top: -6px;
+  right: -16px;
+  animation-delay: 1.5s;
+}
+
+/* ── 5. Feature card gradient border on hover + feature number ── */
+.feature-card-enhanced {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.feature-card-enhanced::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, oklch(0.606 0.25 292.717 / 0.5), oklch(0.702 0.183 293.541 / 0.5), oklch(0.491 0.27 292.581 / 0.5));
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: -1;
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+}
+
+.feature-card-enhanced:hover::before {
+  opacity: 1;
+}
+
+.feature-card-enhanced:hover {
+  border-color: transparent;
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px oklch(0.606 0.25 292.717 / 0.12);
+}
+
+/* Feature card number */
+.feature-card-number {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1;
+  color: oklch(0.606 0.25 292.717 / 0.06);
+  font-family: ui-serif, Georgia, serif;
+  pointer-events: none;
+  user-select: none;
+  transition: color 0.3s ease;
+}
+
+.feature-card-enhanced:hover .feature-card-number {
+  color: oklch(0.606 0.25 292.717 / 0.12);
+}
+
+.dark .feature-card-number {
+  color: oklch(0.702 0.183 293.541 / 0.08);
+}
+
+.dark .feature-card-enhanced:hover .feature-card-number {
+  color: oklch(0.702 0.183 293.541 / 0.15);
+}
+
+/* ── 6. Enhanced step connector ── */
+.step-connector-enhanced {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 40px;
+  width: 56px;
+}
+
+.step-connector-enhanced::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 0;
+  border-top: 2px dashed oklch(0.606 0.25 292.717 / 0.5);
+  animation: connector-dash-anim 2s linear infinite;
+}
+
+@keyframes connector-dash-anim {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -20; }
+}
+
+.step-connector-enhanced .connector-arrow {
+  position: relative;
+  z-index: 1;
+  color: oklch(0.606 0.25 292.717 / 0.7);
+  filter: drop-shadow(0 0 4px oklch(0.606 0.25 292.717 / 0.3));
+  transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.step-connector-enhanced:hover .connector-arrow {
+  color: oklch(0.606 0.25 292.717);
+  transform: translateX(3px);
+}
+
+/* ── 7. CTA button pulse animation ── */
+.cta-text-pulse {
+  animation: cta-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes cta-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+/* ── 8. Popular plan glow ── */
+@keyframes popular-glow {
+  0%, 100% { box-shadow: 0 0 30px oklch(0.606 0.25 292.717 / 0.1), 0 8px 30px oklch(0 0 0 / 0.04); }
+  50% { box-shadow: 0 0 50px oklch(0.606 0.25 292.717 / 0.18), 0 8px 30px oklch(0 0 0 / 0.06); }
+}
+
+.popular-plan-glow {
+  animation: popular-glow 3s ease-in-out infinite;
+}
+
+/* ── 9. CTA text pulse ── */
+@keyframes cta-text-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+.cta-text-pulse {
+  animation: cta-text-pulse 2s ease-in-out infinite;
+}
+
+/* ── 10. Newsletter premium gradient ── */
+.newsletter-premium-input {
+  background: linear-gradient(135deg, oklch(0.961 0.021 293 / 0.6), oklch(1 0 0 / 0.8));
+  border: 1.5px solid oklch(0.606 0.25 292.717 / 0.2);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.newsletter-premium-input:focus {
+  border-color: oklch(0.606 0.25 292.717 / 0.5);
+  box-shadow: 0 0 0 3px oklch(0.606 0.25 292.717 / 0.1), 0 0 20px oklch(0.606 0.25 292.717 / 0.08);
+}
+
+.dark .newsletter-premium-input {
+  background: linear-gradient(135deg, oklch(0.22 0.02 293 / 0.6), oklch(0.25 0.025 293 / 0.8));
+  border-color: oklch(0.606 0.25 292.717 / 0.15);
+}
+
+.dark .newsletter-premium-input:focus {
+  border-color: oklch(0.606 0.25 292.717 / 0.35);
+  box-shadow: 0 0 0 3px oklch(0.606 0.25 292.717 / 0.15), 0 0 20px oklch(0.606 0.25 292.717 / 0.1);
+}
+
+.newsletter-premium-btn {
+  background: linear-gradient(135deg, oklch(0.606 0.25 292.717), oklch(0.702 0.183 293.541));
+  color: white;
+  font-weight: 600;
+  border: none;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.newsletter-premium-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.15), transparent);
+  transition: left 0.5s ease;
+  pointer-events: none;
+}
+
+.newsletter-premium-btn:hover::before {
+  left: 150%;
+}
+
+.newsletter-premium-btn:hover {
+  box-shadow: 0 4px 20px oklch(0.606 0.25 292.717 / 0.3);
+  transform: translateY(-1px);
+}
+
+/* ════════════════════════════════════════════════════════════════
    CODE VIEWER CUSTOM SCROLLBAR
    ════════════════════════════════════════════════════════════════ */
 

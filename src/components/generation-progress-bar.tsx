@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 interface GenerationProgressBarProps {
   currentStep: number;
   totalSteps?: number;
+  statusMessage?: string; // Real-time status message from SSE
 }
 
 const stepLabels = [
@@ -19,10 +20,40 @@ const stepLabels = [
   'Finalizing...',
 ];
 
-export function GenerationProgressBar({ currentStep, totalSteps = 6 }: GenerationProgressBarProps) {
+/** Typewriter hook for smooth status text reveal */
+function useTypewriter(text: string, speed = 20) {
+  const [displayed, setDisplayed] = useState('');
+  const indexRef = useRef(0);
+
+  useEffect(() => {
+    if (!text) {
+      setDisplayed('');
+      indexRef.current = 0;
+      return;
+    }
+
+    indexRef.current = 0;
+    setDisplayed('');
+
+    const timer = setInterval(() => {
+      indexRef.current += 1;
+      setDisplayed(text.substring(0, indexRef.current));
+      if (indexRef.current >= text.length) {
+        clearInterval(timer);
+      }
+    }, speed);
+
+    return () => clearInterval(timer);
+  }, [text, speed]);
+
+  return displayed;
+}
+
+export function GenerationProgressBar({ currentStep, totalSteps = 6, statusMessage }: GenerationProgressBarProps) {
   // Smooth sub-step interpolation for fluid progress
   const [smoothProgress, setSmoothProgress] = useState(0);
   const targetProgress = Math.min((currentStep / totalSteps) * 100, 100);
+  const typedDetail = useTypewriter(statusMessage ?? '', 20);
 
   useEffect(() => {
     const duration = 800;
@@ -40,6 +71,10 @@ export function GenerationProgressBar({ currentStep, totalSteps = 6 }: Generatio
 
     requestAnimationFrame(step);
   }, [targetProgress, smoothProgress]);
+
+  // Determine what label to show: prefer real-time SSE detail, fallback to step label
+  const displayLabel = typedDetail || stepLabels[Math.min(currentStep - 1, stepLabels.length - 1)];
+  const isRealTime = Boolean(typedDetail);
 
   return (
     <motion.div
@@ -78,9 +113,10 @@ export function GenerationProgressBar({ currentStep, totalSteps = 6 }: Generatio
         <Loader2 className="h-3 w-3 text-primary animate-spin" />
         <span className={cn(
           'text-[11px] font-medium transition-all duration-300',
-          currentStep <= totalSteps ? 'text-foreground' : 'text-green-600 dark:text-green-400'
+          currentStep <= totalSteps ? 'text-foreground' : 'text-green-600 dark:text-green-400',
+          isRealTime && 'text-primary'
         )}>
-          {stepLabels[Math.min(currentStep - 1, stepLabels.length - 1)]}
+          {displayLabel}
         </span>
         <span className="text-[10px] text-muted-foreground/70 font-mono tabular-nums">
           {Math.round(smoothProgress)}%
