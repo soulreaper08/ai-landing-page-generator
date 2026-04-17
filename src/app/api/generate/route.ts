@@ -2,56 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import ZAI from 'z-ai-web-dev-sdk';
 import type { StitchGenerationResult, ChangeItem, AdAnalysisResult, PageAnalysisResult } from '@/lib/types';
 
-// ─── Direct Stitch MCP Client ────────────────────────────────────────────────
-// We use direct fetch instead of the SDK because the SDK's internal transport
-// has timeout issues in Next.js's server environment.
-
-const STITCH_MCP_URL = 'https://stitch.googleapis.com/mcp';
-
-async function stitchMcpCall(apiKey: string, toolName: string, args: Record<string, unknown>): Promise<any> {
-  const body = JSON.stringify({
-    jsonrpc: '2.0',
-    id: crypto.randomUUID(),
-    method: 'tools/call',
-    params: {
-      name: toolName,
-      arguments: args,
-    },
-  });
-
-  const res = await fetch(STITCH_MCP_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': apiKey,
-      'Accept': 'application/json, text/event-stream',
-    },
-    body,
-    signal: AbortSignal.timeout(300000), // 5 minute timeout
-  });
-
-  if (!res.ok) {
-    throw new Error(`Stitch MCP HTTP ${res.status}: ${res.statusText}`);
-  }
-
-  const text = await res.text();
-  
-  // Try parsing as JSON-RPC response
-  try {
-    const json = JSON.parse(text);
-    if (json.error) {
-      throw new Error(`Stitch error: ${json.error.message || JSON.stringify(json.error)}`);
-    }
-    return json?.result?.content?.[0]?.text ? JSON.parse(json.result.content[0].text) : json?.result;
-  } catch (e) {
-    if (e instanceof SyntaxError) {
-      // Maybe it's SSE or something else
-      throw new Error(`Unexpected Stitch response: ${text.substring(0, 200)}`);
-    }
-    throw e;
-  }
-}
-
 // POST /api/generate
 // Accepts: { adImage: string (base64), pageUrl: string }
 // Returns: { success: boolean, result: StitchGenerationResult }
@@ -74,7 +24,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[Generate] Starting full pipeline — VLM analysis + page scrape + Stitch generation');
+    console.log('[Generate] Starting full pipeline — VLM analysis + page scrape + LLM generation');
 
     let result: StitchGenerationResult;
 
@@ -100,7 +50,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ─── Full Pipeline: Analyze → Scrape → Stitch Generate ─────────────────────────
+// ─── Full Pipeline: Analyze → Scrape → LLM Generate → Analyze ──────────────────
 
 async function fullPipeline(
   adImage: string,
@@ -122,19 +72,18 @@ async function fullPipeline(
   console.log('[Generate] Step 3: Fetching original page HTML...');
   const originalHtml = await fetchOriginalHtml(pageUrl);
 
-  // Step 4: Generate the HTML page via Google Stitch
-  console.log('[Generate] Step 4: Generating HTML via Google Stitch...');
-  const stitchResult = await generateViaStitch(adAnalysis, pageAnalysis);
-  const { htmlCode, stitchProjectId, stitchScreenId } = stitchResult;
+  // Step 4: Generate HTML page via LLM
+  console.log('[Generate] Step 4: Generating HTML via LLM...');
+  const htmlCode = await generateHtmlViaLLM(zai, adAnalysis, pageAnalysis);
+  console.log('[Generate] HTML generated, length:', htmlCode.length);
 
-  // Step 5: Generate analysis/changes using LLM
-  console.log('[Generate] Step 5: Generating analysis...');
+  // Step 5: Generate quality analysis using LLM
+  console.log('[Generate] Step 5: Generating quality analysis...');
   const analysis = await generateAnalysis(zai, adAnalysis, pageAnalysis, htmlCode);
 
   return {
     success: true,
-    projectId: stitchProjectId,
-    screenId: stitchScreenId,
+    projectId: `gen-${Date.now()}`,
     htmlCode,
     originalHtml,
     qualityScore: analysis.qualityScore,
@@ -168,7 +117,10 @@ function isValidAnalysisHeadline(headline: string): boolean {
   return true;
 }
 
-async function analyzeAdImage(zai: Awaited<ReturnType<typeof ZAI.create>>, imageInput: string): Promise<AdAnalysisResult> {
+async function analyzeAdImage(
+  zai: Awaited<ReturnType<typeof ZAI.create>>,
+  imageInput: string,
+): Promise<AdAnalysisResult> {
   const isBase64 = imageInput.startsWith('data:image/');
 
   if (!isBase64) {
@@ -232,12 +184,12 @@ Respond ONLY with valid JSON in this exact format:
 
     const raw = response.choices?.[0]?.message?.content ?? '';
     const parsed = parseAdAnalysis(raw);
-    
+
     if (!isValidAnalysisHeadline(parsed.headline)) {
       console.warn('[Generate] VLM returned invalid headline, using fallback:', parsed.headline?.substring(0, 50));
       return buildFallbackAdAnalysis();
     }
-    
+
     return parsed;
   } catch (error) {
     console.warn('[Generate] VLM analysis failed:', error);
@@ -245,7 +197,11 @@ Respond ONLY with valid JSON in this exact format:
   }
 }
 
-async function analyzeAdImageWithRetry(zai: Awaited<ReturnType<typeof ZAI.create>>, imageInput: string, maxRetries = 2): Promise<AdAnalysisResult> {
+async function analyzeAdImageWithRetry(
+  zai: Awaited<ReturnType<typeof ZAI.create>>,
+  imageInput: string,
+  maxRetries = 2,
+): Promise<AdAnalysisResult> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const result = await analyzeAdImage(zai, imageInput);
     if (isValidAnalysisHeadline(result.headline)) {
@@ -253,7 +209,7 @@ async function analyzeAdImageWithRetry(zai: Awaited<ReturnType<typeof ZAI.create
     }
     if (attempt < maxRetries) {
       console.log(`[Generate] Retrying VLM analysis (attempt ${attempt + 2}/${maxRetries + 1})...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
   return buildFallbackAdAnalysis();
@@ -312,7 +268,13 @@ function buildFallbackAdAnalysis(): AdAnalysisResult {
 
 async function scrapeLandingPage(url: string): Promise<PageAnalysisResult> {
   const normalizedUrl = url.startsWith('http') ? url : `https://${url}`;
-  const domain = (() => { try { return new URL(normalizedUrl).hostname; } catch { return url; } })();
+  const domain = (() => {
+    try {
+      return new URL(normalizedUrl).hostname;
+    } catch {
+      return url;
+    }
+  })();
 
   try {
     const res = await fetch(`https://r.jina.ai/${normalizedUrl}`, {
@@ -408,135 +370,196 @@ async function fetchOriginalHtml(url: string): Promise<string> {
   }
 }
 
-// ─── HTML Generation via Google Stitch (Direct MCP HTTP) ──────────────────────
+// ─── HTML Generation via LLM ─────────────────────────────────────────────────
 
-async function generateViaStitch(
-  ad: AdAnalysisResult,
-  page: PageAnalysisResult,
-): Promise<{ htmlCode: string; stitchProjectId: string; stitchScreenId: string }> {
-  const apiKey = process.env.STITCH_API_KEY;
-  if (!apiKey) {
-    throw new Error('STITCH_API_KEY is not configured. Please set it in your .env file.');
-  }
+function buildHtmlGenerationPrompt(ad: AdAnalysisResult, page: PageAnalysisResult): string {
+  return `You are an expert web developer and designer. Generate a COMPLETE, STANDALONE HTML landing page.
 
-  // Build a comprehensive prompt for Stitch
-  const stitchPrompt = `Design a stunning, high-converting landing page.
+CRITICAL RULES:
+- Output ONLY the raw HTML code. NO markdown, NO code fences, NO explanation, NO comments before/after.
+- The HTML must be a complete document starting with <!DOCTYPE html> and ending with </html>.
+- All CSS must be inline in a <style> tag within <head>.
+- Include all JavaScript inline in <script> tags if needed.
+- The page must look stunning and professional.
 
-REFERENCE WEBSITE: ${page.url}
-Please scrape and analyze the website at ${page.url} to understand its structure, content, and purpose, then create a personalized landing page based on it.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-DESIGN STYLE (extracted from ad creative — apply these to the page):
-- Primary Color: ${ad.colors.primary}
-- Secondary Color: ${ad.colors.secondary}  
-- Accent Color (for CTAs/buttons): ${ad.colors.accent}
-- Background Color: ${ad.colors.background}
-- Text Color: ${ad.colors.text}
-- Brand Tone: ${ad.tone}
+## AD CREATIVE DESIGN SPECIFICATIONS
+
+### COLOR PALETTE (use these EXACT hex codes):
+- Primary: ${ad.colors.primary}
+- Secondary: ${ad.colors.secondary}
+- Accent (CTAs/buttons): ${ad.colors.accent}
+- Background: ${ad.colors.background}
+- Text: ${ad.colors.text}
+
+### CONTENT FROM THE AD:
+- Headline: "${ad.headline}"
+- Subheadline: "${ad.subheadline || 'Discover how we can help you achieve your goals'}"
+- CTA Button: "${ad.ctaText}"
+- Value Props: ${ad.valueProps.join(', ')}
+
+### BRAND PERSONALITY:
+- Tone: ${ad.tone}
 - Visual Style: ${ad.style}
 - Emotional Appeal: ${ad.emotionalAppeal}
 
-PAGE CONTENT:
-- Headline: "${ad.headline}"
-- Subheadline: "${ad.subheadline || 'Discover how we can help you achieve your goals'}"
-- CTA Button Text: "${ad.ctaText}"
-- Key Value Propositions: ${ad.valueProps.join(', ')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-REQUIREMENTS:
-1. Create a desktop landing page that matches the ad creative's visual style
-2. Use the exact colors specified above as the design system
-3. Include a hero section with the headline, subheadline, and CTA button
-4. Add social proof elements (trust badges, testimonials area, or client logos)
-5. Include a features/benefits section
-6. Add urgency elements if appropriate for the "${ad.tone}" tone
-7. Make it fully responsive
-8. Include subtle animations (hover effects, transitions)
-9. The design should look like a premium SaaS product page
-10. Use the website at ${page.url} as inspiration for content structure and layout`;
+## REFERENCE WEBSITE
 
-  // Step 1: Create project
-  console.log('[Generate] Stitch: Creating project...');
-  const projectResult = await stitchMcpCall(apiKey, 'create_project', {
-    title: `Troopod — ${page.domain}`,
+URL: ${page.url}
+Title: "${page.title}"
+Domain: ${page.domain}
+
+Current Headline: "${page.currentHeadline}"
+Current Subheadline: "${page.currentSubheadline}"
+Current CTA: "${page.currentCTA}"
+Sections Detected: ${page.sections.join(', ')}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## PAGE STRUCTURE TO BUILD
+
+Build a complete landing page with these sections (in order):
+
+### 1. TRUST BAR (top)
+- Thin bar with "Trusted by 10,000+ professionals" or similar
+- Subtle background, small text
+
+### 2. HERO SECTION
+- Large bold headline using the ad headline EXACTLY: "${ad.headline}"
+- Supporting subheadline: "${ad.subheadline || 'Discover how we can help you achieve your goals'}"
+- Primary CTA button with text "${ad.ctaText}" using accent color ${ad.colors.accent}
+- Secondary ghost button "Learn More"
+- Background: gradient using primary ${ad.colors.primary} to secondary ${ad.colors.secondary}
+- Add animated gradient orbs or subtle background patterns for depth
+
+### 3. SOCIAL PROOF STRIP
+- Row of 4-5 company/brand logos as text (e.g. "Google", "Microsoft", "Stripe")
+- "Loved by 2,500+ teams" text
+
+### 4. VALUE PROPOSITIONS (3 columns)
+- 3 cards with icons for: ${ad.valueProps.slice(0, 3).map((v, i) => `${i + 1}. "${v}"`).join(', ')}
+- Each card has an icon area (CSS-only), title, and description
+- Hover effects: lift + shadow
+
+### 5. FEATURES SECTION
+- Heading: "Everything You Need"
+- 6 feature cards in a 3x2 grid
+- Each card: icon, title, description
+- Glass-morphism or gradient card backgrounds
+- Staggered entrance animations via CSS
+
+### 6. HOW IT WORKS (3 steps)
+- Step 1: "Sign Up" — Create your account in seconds
+- Step 2: "Configure" — Set up your preferences  
+- Step 3: "Launch" — Go live and start seeing results
+- Connected with arrows or step indicators
+- ${ad.style === 'modern' ? 'Minimal, clean design with numbered circles' : ad.style === 'bold' ? 'Large numbers, high contrast, strong typography' : 'Clean cards with step icons'}
+
+### 7. TESTIMONIALS
+- 3 testimonial cards with name, role, company, star rating
+- Quote mark decorative element
+- Subtle card shadows
+
+### 8. PRICING TABLE (3 plans)
+- Starter (Free), Pro ($29/mo, highlighted), Enterprise (Custom)
+- Feature lists with checkmarks
+- CTA buttons on each
+
+### 9. FAQ SECTION
+- 4-5 expandable FAQ items
+- Clean accordion-style layout
+
+### 10. CTA SECTION (bottom)
+- Large centered CTA: "${ad.ctaText}"
+- Email input + button combination
+- Gradient background matching the hero
+
+### 11. FOOTER
+- 4-column layout: Product, Company, Resources, Legal
+- Copyright notice
+- Social media icon links (CSS-only)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## TECHNICAL REQUIREMENTS
+
+### CSS:
+- Use CSS custom properties for all colors:
+  :root { --primary: ${ad.colors.primary}; --secondary: ${ad.colors.secondary}; --accent: ${ad.colors.accent}; --bg: ${ad.colors.background}; --text: ${ad.colors.text}; }
+- Fully responsive (mobile, tablet, desktop) using @media queries
+- Smooth hover transitions on all interactive elements
+- CSS animations for: floating background orbs, pulse effects on CTAs, fade-in on scroll
+- Max width: 1200px, centered
+- Font: system-ui, -apple-system, sans-serif
+- Box shadows, border-radius, backdrop-blur for modern feel
+
+### JavaScript:
+- FAQ accordion toggle (click to expand/collapse)
+- Smooth scroll for anchor links
+- Mobile hamburger menu toggle
+
+### DO NOT:
+- Do NOT use any external CDN links
+- Do NOT use placeholder images (use colored divs with CSS gradients)
+- Do NOT include any markdown formatting
+- Do NOT wrap the HTML in code fences
+
+OUTPUT THE COMPLETE HTML NOW.`;
+}
+
+async function generateHtmlViaLLM(
+  zai: Awaited<ReturnType<typeof ZAI.create>>,
+  ad: AdAnalysisResult,
+  page: PageAnalysisResult,
+): Promise<string> {
+  const prompt = buildHtmlGenerationPrompt(ad, page);
+
+  console.log('[Generate] Calling LLM for HTML generation (glm-4.6)...');
+
+  const response = await zai.chat.completions.create({
+    model: 'glm-4.6',
+    messages: [
+      {
+        role: 'system',
+        content: 'You are an expert web developer. You output ONLY raw HTML code. Never include markdown code fences, explanations, or any text outside the HTML document. Your output must start with <!DOCTYPE html> and end with </html>.',
+      },
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ],
+    temperature: 0.7,
+    max_tokens: 16000,
   });
-  
-  const rawProjectId = projectResult?.projectId || projectResult?.id || projectResult?.name;
-  const projectId = rawProjectId?.startsWith('projects/') 
-    ? rawProjectId.slice('projects/'.length) 
-    : rawProjectId;
-  
-  if (!projectId) {
-    throw new Error('Failed to create Stitch project: no project ID returned');
-  }
-  console.log('[Generate] Stitch: Project created:', projectId);
 
-  // Step 2: Generate screen using GEMINI_3_FLASH
-  console.log('[Generate] Stitch: Generating screen (this takes 30-60s)...');
-  const screenResult = await stitchMcpCall(apiKey, 'generate_screen_from_text', {
-    projectId,
-    prompt: stitchPrompt,
-    deviceType: 'DESKTOP',
-    modelId: 'GEMINI_3_FLASH',
-  });
+  let html = response.choices?.[0]?.message?.content ?? '';
+  console.log('[Generate] Raw LLM response length:', html.length);
 
-  // Step 3: Extract screen data
-  const outputComponents = screenResult?.outputComponents || [];
-  let screenData: any = null;
+  // Clean up markdown code fences if the model wraps them
+  html = html.replace(/^```html\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+  html = html.trim();
 
-  for (const comp of outputComponents) {
-    if (comp?.design?.screens?.length > 0) {
-      screenData = comp.design.screens[0];
-      break;
+  // If the response doesn't start with <!DOCTYPE or <html, try to extract HTML
+  if (!html.startsWith('<!DOCTYPE') && !html.startsWith('<html')) {
+    const htmlMatch = html.match(/(<!DOCTYPE[\s\S]*<\/html>)/i);
+    if (htmlMatch) {
+      html = htmlMatch[1];
     }
   }
 
-  if (!screenData) {
-    screenData = screenResult?.screens?.[0] || screenResult?.design?.screens?.[0];
+  // Validate minimum content
+  if (html.length < 200) {
+    console.error('[Generate] LLM returned too short response:', html.substring(0, 200));
+    throw new Error('The AI generated an insufficient response. Please try again.');
   }
-  
-  const screenId = screenData?.id || screenData?.name || screenData?.screenId;
-  
-  if (!screenId || !screenData) {
-    console.error('[Generate] Stitch: No screen found. Components:', 
-      outputComponents.map((c: any, i: number) => `  [${i}] keys=[${Object.keys(c).join(',')}]`).join('\n'));
-    throw new Error('Stitch generated a design system but no screen. The API may be processing — please try again.');
-  }
-  console.log('[Generate] Stitch: Screen generated:', screenId);
-
-  // Step 4: Get HTML download URL
-  let htmlUrl = screenData?.htmlCode?.downloadUrl;
-  
-  if (!htmlUrl) {
-    console.log('[Generate] Stitch: Fetching HTML via get_screen...');
-    const screenDetail = await stitchMcpCall(apiKey, 'get_screen', {
-      projectId,
-      screenId,
-      name: `projects/${projectId}/screens/${screenId}`,
-    });
-    htmlUrl = screenDetail?.htmlCode?.downloadUrl;
-  }
-
-  if (!htmlUrl) {
-    throw new Error('Stitch generated a screen but could not retrieve the HTML download URL.');
-  }
-  console.log('[Generate] Stitch: HTML URL obtained');
-
-  // Step 5: Download the actual HTML
-  console.log('[Generate] Stitch: Downloading HTML content...');
-  const htmlResponse = await fetch(htmlUrl, {
-    signal: AbortSignal.timeout(30000),
-  });
-  
-  if (!htmlResponse.ok) {
-    throw new Error(`Failed to download HTML from Stitch: HTTP ${htmlResponse.status}`);
-  }
-  
-  let htmlCode = await htmlResponse.text();
-  console.log('[Generate] Stitch: HTML downloaded, length:', htmlCode.length);
 
   // Ensure it's a valid HTML document
-  if (!htmlCode.includes('<html') && !htmlCode.includes('<!DOCTYPE')) {
-    console.warn('[Generate] Stitch returned non-HTML content, wrapping...');
-    htmlCode = `<!DOCTYPE html>
+  if (!html.includes('<html') && !html.includes('<!DOCTYPE')) {
+    console.warn('[Generate] Response is not valid HTML, wrapping...');
+    html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -544,16 +567,12 @@ REQUIREMENTS:
   <title>${ad.headline} — ${page.domain}</title>
 </head>
 <body>
-${htmlCode}
+${html}
 </body>
 </html>`;
   }
 
-  return {
-    htmlCode,
-    stitchProjectId: projectId,
-    stitchScreenId: screenId,
-  };
+  return html;
 }
 
 // ─── Analysis Generation ──────────────────────────────────────────────────────
@@ -591,7 +610,7 @@ Respond ONLY with valid JSON in this format:
     const response = await zai.chat.completions.create({
       model: 'glm-4.6',
       messages: [
-        { role: 'assistant', content: 'Output only valid JSON, no markdown or code fences.' },
+        { role: 'system', content: 'Output only valid JSON, no markdown or code fences.' },
         { role: 'user', content: analysisPrompt },
       ],
     });
@@ -602,7 +621,7 @@ Respond ONLY with valid JSON in this format:
     return {
       qualityScore: 88,
       changes: buildMockChanges(),
-      explanation: `Generated a personalized landing page matching the "${ad.headline}" ad creative using Google Stitch. The page features matching colors, messaging, and conversion elements for improved post-click performance.`,
+      explanation: `Generated a personalized landing page matching the "${ad.headline}" ad creative. The page features matching colors, messaging, and conversion elements for improved post-click performance.`,
     };
   }
 }
@@ -651,7 +670,7 @@ function parseAnalysisResponse(raw: string): {
     return {
       qualityScore: 88,
       changes: buildMockChanges().slice(0, 5),
-      explanation: 'Generated a personalized hero section that matches the ad creative branding with improved visual hierarchy and conversion elements.',
+      explanation: 'Generated a personalized landing page that matches the ad creative branding with improved visual hierarchy and conversion elements.',
     };
   }
 

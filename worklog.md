@@ -2,6 +2,64 @@
 
 ---
 
+## Fix Generation Failed + Replace Stitch with LLM — 2026-04-21 (Task 1)
+
+### Overall Assessment: ✅ Working
+- **ESLint**: Zero errors, zero warnings
+- **Dev Server**: Compiling successfully, all routes returning 200
+- **API `/api/generate`**: Returns 200 with LLM-generated HTML (~32K-39K chars)
+- **History DB**: 2 generations saved successfully
+
+### What Changed
+
+Replaced the broken Google Stitch MCP API with direct **z-ai-web-dev-sdk LLM (glm-4.6)** for HTML generation. The Stitch MCP was unreliable — it sometimes returned only design systems without screens, and the 5-step MCP dance (create_project → generate_screen → extract_screen → get_html → download) was fragile.
+
+### Key Changes
+
+#### 1. Complete Rewrite of `/api/generate/route.ts`
+- **Removed**: All Stitch MCP code (`stitchMcpCall()`, `generateViaStitch()`, Stitch project/screen ID management)
+- **Added**: `generateHtmlViaLLM()` — Uses `z-ai-web-dev-sdk` chat.completions with `glm-4.6` model, `max_tokens: 16000`, `temperature: 0.7`
+- **Prompt engineering**: `buildHtmlGenerationPrompt()` creates a comprehensive prompt with:
+  - Exact color palette from VLM analysis (CSS custom properties)
+  - Ad headline, subheadline, CTA text
+  - Reference website context (title, domain, sections)
+  - 11-section page structure specification (trust bar, hero, social proof, value props, features, how-it-works, testimonials, pricing, FAQ, CTA, footer)
+  - CSS requirements (responsive, animations, hover effects, no external dependencies)
+- **HTML cleanup**: Strips markdown code fences, validates minimum length, wraps in DOCTYPE if needed
+- **Kept**: VLM analysis (glm-4.6v), Jina scraping, quality analysis, all error handling
+
+#### 2. Pipeline Flow (unchanged interface)
+1. VLM analyzes ad image → colors, headline, CTA, tone, style
+2. Jina scrapes target URL → page title, sections, content
+3. Fetches original HTML for before/after comparison
+4. **LLM generates complete HTML** (NEW — was Stitch before)
+5. LLM generates quality analysis → score, changes, explanation
+
+### Files Modified
+- `src/app/api/generate/route.ts` — Complete rewrite: removed Stitch MCP, added LLM generation
+
+### QA Results
+- ✅ ESLint: 0 errors, 0 warnings
+- ✅ API test (curl): `POST /api/generate` → 200, HTML 32791 chars (1.8 min)
+- ✅ API test (browser): `POST /api/generate` → 200, HTML 36243 chars (2.2 min)
+- ✅ API test (browser): `POST /api/generate` → 200, HTML 38829 chars (2.6 min)
+- ✅ History saved to DB: `POST /api/history` → 201
+- ✅ History retrieval: `GET /api/history` → 2 items, correct scores
+- ✅ Frontend: All sections rendering, input flow working, generate button enables
+
+### Known Issues
+1. **Generation time ~2 minutes** — LLM generates ~35K chars of HTML; could benefit from streaming
+2. **Small test images may fallback** — 10x10 pixel test image triggers fallback analysis; real ad images work properly
+
+### Priority Recommendations for Next Phase
+1. Add SSE streaming endpoint for real-time progress updates during generation
+2. Add WebSocket real-time progress updates
+3. Performance: lazy-load below-fold sections
+4. Mobile responsive QA
+5. Add dark mode refinements
+
+---
+
 ## Google Stitch API Integration — 2026-04-20 (Task 7)
 
 ### Overall Assessment: ✅ Working
