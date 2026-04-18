@@ -238,6 +238,7 @@ export default function Home() {
       const decoder = new TextDecoder();
       let buffer = '';
       let finalData: Record<string, unknown> | null = null;
+      let currentEventType = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -247,8 +248,12 @@ export default function Home() {
         const lines = buffer.split('\n');
         buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
-        let currentEventType = '';
         for (const line of lines) {
+          if (line.trim() === '') {
+            // End of an event
+            currentEventType = '';
+            continue;
+          }
           if (line.startsWith('event: ')) {
             currentEventType = line.substring(7).trim();
           } else if (line.startsWith('data: ')) {
@@ -271,7 +276,6 @@ export default function Home() {
             } catch {
               // Ignore JSON parse errors for partial chunks
             }
-            currentEventType = '';
           }
         }
       }
